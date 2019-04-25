@@ -1,0 +1,59 @@
+[general]
+# generete output to
+output_dir="benchmark-output"
+# override output_dir or create unique output dir
+override_output=false
+log_file="benchmark.log"
+
+[[translators]]
+from="TPTP"
+to="LADR"
+PATH="."
+executable="TPTP_to_LADR"
+
+[[testInput]]
+# for specyfying invlude/exclude in testCase
+name="variableLength"
+# path to testInput.files
+path="."
+
+[[testInput.files]]
+# wildcards supported
+path=["lib/TPTP/*/CNF*.p"]
+# currently only TPTP
+format="TPTP"
+
+[[testSuite]]
+name="prover9 tests"
+# name available in PATH
+executable="prover9"
+# append to path env variable, comment or leave empty to disable
+PATH=["lib/prover9"]
+# metadata appended to each file, comment to disable
+version_options="--version"
+# options always appended to executable, comment or leave empty to disable
+options=["--quiet"]
+# specify command line options to test
+
+[[testSuite.testCase]]
+# metadata
+name="Prover9 without options"
+# what file format is accepted by prover, input will be automatically translated if possible
+16format="LADR"
+# mutually exclusive options input_as_stdin, input_as_last_argument, input_after_option
+input_as_stdin=true
+# input_as_last_argument=false
+# input_after_option="-o"
+
+# mutually exclusive: include or exclude inputs for test. Comment both to test all
+include_only=["variableLength"]
+# exclude=[""]
+
+# nested [] in options means 'pick one of listed'. NOTE: toml arrays can hold only one type.
+options=[]
+
+[[testSuite.testCase]]
+name="Prover9 with -Auto2"
+format="LADR"
+input_as_stdin=true
+options=["", "-x"]
