@@ -1,23 +1,13 @@
 import os
 import toml as toml
-#import nltk
+# import nltk
 import subprocess
 
-here = os.path.abspath(os.path.dirname(__file__))
+# current working directory
+cwd = os.path.abspath(os.path.dirname(__file__))
 
-default_config_fname = os.path.join(here, 'config/default_config.toml')
-config_fname = os.path.join(here, 'config/config.toml')
-
-
-#jeszcze nie uwzgledniam w mainie load_params() ani my_setup(), nawet nie wiem czy sa dobrze napisane
-def main():
-    tptp_file = os.path.join(here, 'testing/test.tptp')
-    command = f"tptp_to_ladr < {tptp_file} | prover9 > {here}/testing/ladr_file.out"
-    print(command.split(), end='')
-    #print(subprocess.check_call(command.split()))
-    #subprocess.Popen(command.split())
-    #subprocess.call(command.split()) #Popen ani call nie dzialaja, czemu?
-    os.system(command)
+default_config_fname = os.path.join(cwd, 'default_config.toml')
+config_fname = os.path.join(cwd, 'config.toml')
 
 
 def my_setup():
@@ -26,7 +16,7 @@ def my_setup():
     parameters.
     """
     new_params = {}
-    params = load_params(fname=default_config_fname)
+    params = load_params(fname=config_fname)
     sep = 8 * " " + 8 * "*" + 8 * " "
 
     print(sep + "You will now have to set parameters for benchmark.\n" +
@@ -55,7 +45,6 @@ def my_setup():
     return new_params
 
 
-
 def load_params(fname=config_fname, param=""):
     """
     Load parameters from file.
@@ -77,4 +66,12 @@ def load_params(fname=config_fname, param=""):
         return params
 
 
-main()
+if __name__ == '__main__':
+    # jeszcze nie uwzgledniam w mainie load_params() ani my_setup(), nawet nie wiem czy sa dobrze napisane
+    tptp_file = os.path.join(cwd, 'tests/data/test.p')
+    # command = f"tptp_to_ladr < {tptp_file} | prover9 > {cwd}/tests/ladr_file.out"
+    # print(command.split(), end='')
+    # print(subprocess.check_call(command.split()))
+    # subprocess.Popen(command.split())
+    # subprocess.call(command.split()) #Popen ani call nie dzialaja, czemu?
+    # os.system(command)
