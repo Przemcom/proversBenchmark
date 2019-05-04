@@ -38,9 +38,9 @@ class Translator:
         stdin = subprocess.DEVNULL
         stdout = subprocess.DEVNULL
         stderr = subprocess.DEVNULL
-        if not self.output_after_option or not self.input_as_last_argument:
+        if not self.output_after_option:
             stdout = open(output_filename, 'w')
-        if not self.input_after_option:
+        if not self.input_after_option and not self.input_as_last_argument:
             stdin = open(input_filename, 'r')
 
         env = os.environ
