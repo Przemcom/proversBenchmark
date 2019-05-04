@@ -8,6 +8,10 @@ from_format="TPTP"
 to_format="LADR"
 PATH="."
 executable="TPTP_to_LADR"
+options=[]
+input_after_option="-TPTP"
+input_as_last_argument=false
+output_after_option=""
 
 [[testInputs]]
 # for specifying include/exclude in testCase

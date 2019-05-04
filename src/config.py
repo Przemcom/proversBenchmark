@@ -9,6 +9,7 @@ from typing import List, Dict, Type
 
 import toml
 
+from src import BenchmarkException, ConfigException
 from src.testcase import TestCase
 from src.testinput import TestInput
 from src.testsuite import TestSuite
@@ -76,7 +77,10 @@ class Config:
             self.log_unknown_keys(benchmark_config)
 
         if self._load_errors_occured:
-            raise Exception("Errors occured in config. see log warnings and errors")
+            self.test_inputs.clear()
+            TestInput.translators.clear()
+            self.test_suites.clear()
+            raise ConfigException("Errors occured in config. see log warnings and errors")
 
     @Decorators.log_scope("general")
     def _load_general(self, config: Dict):
@@ -110,6 +114,7 @@ class Config:
 
     @Decorators.log_scope("translators")
     def _load_translators(self, config: Dict):
+        # todo: handle multiple translators for one format
         translators_config, ok = self._pop_key(source=config,
                                                variable="translators",
                                                context=config,
@@ -121,33 +126,62 @@ class Config:
 
         for translator_config in translators_config:
             # for error reporting
-            translator_copy = copy.deepcopy(translator_config)
+            translator_config_copy = copy.deepcopy(translator_config)
 
             error_occured = False
             from_format, ok = self._pop_key(source=translator_config,
                                             variable="from_format",
-                                            context=translator_copy,
+                                            context=translator_config_copy,
                                             required=True,
                                             type_check=str)
             error_occured |= not ok
 
             to_format, ok = self._pop_key(source=translator_config,
                                           variable="to_format",
-                                          context=translator_copy,
+                                          context=translator_config_copy,
                                           required=True,
                                           type_check=str)
             error_occured |= not ok
 
+            options, ok = self._pop_key(source=translator_config,
+                                        variable="options",
+                                        context=translator_config_copy,
+                                        default=[],
+                                        required=False,
+                                        type_check=list)
+            error_occured |= not ok
+
+            input_after_option, ok = self._pop_key(source=translator_config,
+                                                   variable="input_after_option",
+                                                   context=translator_config_copy,
+                                                   required=False,
+                                                   type_check=str)
+            error_occured |= not ok
+
+            input_as_last_argument, ok = self._pop_key(source=translator_config,
+                                                       variable="input_as_last_argument",
+                                                       context=translator_config_copy,
+                                                       required=False,
+                                                       type_check=bool)
+            error_occured |= not ok
+
+            output_after_option, ok = self._pop_key(source=translator_config,
+                                                    variable="output_after_option",
+                                                    context=translator_config_copy,
+                                                    required=False,
+                                                    type_check=str)
+            error_occured |= not ok
+
             executable, ok = self._pop_key(source=translator_config,
                                            variable="executable",
-                                           context=translator_copy,
+                                           context=translator_config_copy,
                                            required=True,
                                            type_check=str)
             error_occured |= not ok
 
             path, ok = self._pop_key(source=translator_config,
                                      variable="PATH",
-                                     context=translator_copy,
+                                     context=translator_config_copy,
                                      default=None,
                                      type_check=str)
             error_occured |= not ok
@@ -156,12 +190,22 @@ class Config:
                 translator = Translator(from_format=from_format,
                                         to_format=to_format,
                                         executable=executable,
-                                        path=path)
-                translator.verify()
-                TestInput.translators.append(translator)
+                                        options=options,
+                                        input_as_last_argument=input_as_last_argument,
+                                        input_after_option=input_after_option,
+                                        output_after_option=output_after_option,
+                                        PATH=path)
+                try:
+                    translator.verify()
+                except FileNotFoundError:
+                    self.log_error(f"executable not found: {translator.executable}", translator_config_copy)
+                except BenchmarkException as e:
+                    self.log_error(e, translator_config_copy)
+                else:
+                    TestInput.translators.append(translator)
 
             if translator_config:
-                self.log_unknown_keys(translator_config, translator_copy)
+                self.log_unknown_keys(translator_config, translator_config_copy)
 
     @Decorators.log_scope("testInputs")
     def _load_test_inputs(self, config: Dict):
@@ -381,7 +425,8 @@ class Config:
             # todo support chaining translators
             if ok:
                 if not any(translator.to_format == format for translator in TestInput.translators):
-                    self.log_warning(f"format {format} is not achievable with defined translators: ", TestInput.translators)
+                    self.log_warning(f"format {format} is not achievable with defined translators: ",
+                                     TestInput.translators)
 
             # nested list
             options, ok = self._pop_key(source=test_case_config,
