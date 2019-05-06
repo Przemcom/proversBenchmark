@@ -6,8 +6,8 @@ log_file="benchmark.log"
 [[translators]]
 from_format="TPTP"
 to_format="LADR"
-PATH="."
-executable="TPTP_to_LADR"
+PATH="../provers/LADR-2009-11A/bin"
+executable="tptp_to_ladr"
 options=[]
 input_after_option="-TPTP"
 input_as_last_argument=false
@@ -19,42 +19,41 @@ name="variableLength"
 # path to files
 path="."
 # wildcards supported
-files=["../**/*.p"]
+files=["**/*.p"]
 # currently only TPTP
-format="TPTP"
+format="TPP"
 
 [[testSuites]]
-name="prover9 tests"
+name="ls dummy test"
 # name available in PATH
-executable="prover9"
+executable="ls"
 # append to path env variable, comment or leave empty to disable
-PATH="lib/prover9"
+#PATH="../provers/LADR-2009-11A/bin"
+#PATH="lib/prover9"
 # metadata appended to each file, comment to disable
-version_option="--version"
+version="0.1"
 # options always appended to executable, comment or leave empty to disable
-options=["--quiet"]
+options=["-1"]
 # specify command line options to test
 
 [[testSuites.testCases]]
 # metadata
-name="Prover9 without options"
+name="ls witout options"
 # what file format is accepted by prover, input will be automatically translated if possible
 format="LADR"
-# mutually exclusive options input_as_stdin, input_as_last_argument, input_after_option
-input_as_stdin=true
-# input_as_last_argument=false
-# input_after_option="-o"
+# mutually exclusive options input_as_last_argument, input_after_option
+#input_as_last_argument=true
+#input_after_option="-o"
 
 # mutually exclusive: include or exclude inputs for test. Comment both to test all
 include_only=["variableLength"]
-# exclude=[""]
+#exclude=[""]
 
 # list of options to test,
 # set to [] or add empty string as option to run testcase without options
 options=[]
 
 [[testSuites.testCases]]
-name="Prover9 with -Auto2"
+name="ls -Auto2"
 format="LADR"
-input_as_stdin=true
-options=["", "-x"]
+options=["-a", "-l"]

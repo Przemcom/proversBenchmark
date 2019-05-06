@@ -1,10 +1,10 @@
 import os
 import subprocess
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, InitVar
 from typing import List
 
-from src import BenchmarkException
-from src.common import is_executable
+from src import BenchmarkException, cwd
+from src.common import is_executable, execute
 
 
 @dataclass
@@ -25,33 +25,31 @@ class Translator:
     output_after_option: str = None
     PATH: str = None
 
+    def __post_init__(self):
+        if self.PATH is not None:
+            self.PATH = os.path.abspath(os.path.join(cwd, self.PATH))
+
+        if not os.path.isdir(self.PATH):
+            raise BenchmarkException(f"PATH '{self.PATH}' is not a directory", self)
+
     def verify(self):
         """Simple check if executable exists
         todo exception handling may be better
         """
         if self.input_after_option and self.input_as_last_argument:
-            raise BenchmarkException("Options input_after_option and input_as_last_argument are mutually exclusive")
-        return is_executable(executable=self.executable, PATH=self.PATH)
+            raise BenchmarkException("Options input_after_option and input_as_last_argument are mutually exclusive",
+                                     self)
+        return is_executable(command=[self.executable], PATH=self.PATH)
 
     def translate(self, input_filename: str, output_filename: str) -> subprocess.Popen:
         command = self.get_command(input_filename, output_filename)
-        stdin = subprocess.DEVNULL
-        stdout = subprocess.DEVNULL
-        stderr = subprocess.DEVNULL
-        if not self.output_after_option:
-            stdout = open(output_filename, 'w')
-        if not self.input_after_option and not self.input_as_last_argument:
-            stdin = open(input_filename, 'r')
-
-        env = os.environ
-        if self.PATH is not None:
-            env["PATH"] = self.PATH + ":" + env["PATH"]
-
-        return subprocess.Popen(command,
-                                stdin=stdin,
-                                stdout=stdout,
-                                stderr=stderr,
-                                env=env)
+        return execute(command=command,
+                       input_filename=input_filename,
+                       output_filename=output_filename,
+                       input_after_option=self.input_after_option,
+                       input_as_last_argument=self.input_as_last_argument,
+                       output_after_option=self.output_after_option,
+                       PATH=self.PATH)
 
     def get_command(self, input_filename: str, output_filename: str) -> List[str]:
         command = [self.executable]

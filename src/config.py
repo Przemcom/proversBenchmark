@@ -3,19 +3,79 @@ import glob
 import logging
 import os
 from dataclasses import dataclass, field
-from functools import wraps
 from pprint import pprint
-from typing import List, Dict, Type
+from typing import List, Dict, Type, NoReturn
 
 import toml
 
 from src import BenchmarkException, ConfigException
-from src.testcase import TestCase
+from src.test import TestCase, TestSuite
 from src.testinput import TestInput
-from src.testsuite import TestSuite
 from src.translators import Translator
 
-logging.basicConfig(level=logging.INFO)
+# todo remove this and make proper logger
+logging.basicConfig(level=logging.DEBUG)
+
+
+@dataclass
+class DictPoper:
+    def __init__(self, source: dict, logger: logging.Logger = logging, *args, **kwargs):
+        self.source = source
+        self._logger = logger
+        self._log_context = []
+        if args:
+            self._log_context.extend(args)
+        if kwargs:
+            self._log_context.append(kwargs)
+        self.errors_occured = False
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if self.source:
+            message = f"Unknown keys: '{self.source}'"
+            self._warning(message)
+
+    def pop_key(self, variable: str, default: any = None, required: bool = False,
+                type_check: Type = None):
+        """Remove and return variable from source and:
+        add default value if not in source
+        log error if required and not in source
+        check type of variable
+        """
+        ok = True
+        value = self.source.pop(variable, default)
+        if required and value is None:
+            ok = False
+            message = f"Missing required key: '{variable}'"
+            self._error(message)
+
+        if value is not None and type_check is not None and type(value) != type_check:
+            ok = False
+            message = f"'{variable}'"
+            f" should be {type_check.__name__},"
+            f" but is {type(value).__name__}"
+            self._error(message)
+
+        return value, ok
+
+    @property
+    def log_context(self):
+        return ' '.join(map(str, self._log_context))
+
+    def _error(self, message):
+        self.errors_occured = True
+        if self.log_context:
+            message = f"{message}, in {self.log_context}"
+
+        self._logger.error(message)
+
+    def _warning(self, message):
+        if self.log_context:
+            message = f"{message}, in {self.log_context}"
+
+        self._logger.warning(message)
 
 
 @dataclass
@@ -23,170 +83,97 @@ class Config:
     config_file: str = "config.toml"
     output_dir: str = "benchmark-output"
     log_file: str = "benchmark.log"
-    test_inputs: List[TestInput] = field(default_factory=list)
     test_suites: List[TestSuite] = field(default_factory=list)
+    test_inputs: List[TestInput] = field(default_factory=list)
 
     _load_errors_occured: bool = False
     _logger: logging.Logger = logging.getLogger("Config")
 
-    _log_scope: List[str] = field(default_factory=list)
-
     def __post_init__(self):
-        self._logger.setLevel(logging.INFO)
+        self._logger.setLevel(logging.DEBUG)
 
-    class Decorators:
-        """Contains decorators specific for Config"""
-        pass
-
-        @staticmethod
-        def log_scope(message):
-            """Decorate to indicate what part of config is being parsed, ex. testInput
-            used for logging
-            stored as stack
-            """
-
-            def log_scope_decorator(func):
-                @wraps(func)
-                def wrapper(self, *args, **kwargs):
-                    self._log_scope.append(message)
-                    result = func(self, *args, **kwargs)
-                    self._log_scope.pop()
-                    return result
-
-                return wrapper
-
-            return log_scope_decorator
-
-    def load_config(self):
+    def load_config(self) -> NoReturn:
         """Load and verify config"""
         self._load_errors_occured = False
         if not os.path.isfile(self.config_file):
-            self._logger.error(f"Config file '{self.config_file}'' is not found/not a file")
+            self._error(f"Config file '{self.config_file}'' is not found/not a file")
             return
 
         self._logger.info(f"Reading {self.config_file}")
         with open(self.config_file) as source:
-            benchmark_config = toml.load(source)
+            benchmark_config = toml.load(self.config_file)
 
-        self._load_general(benchmark_config)
-        self._load_translators(benchmark_config)
-        self._load_test_inputs(benchmark_config)
-        self._load_test_suites(benchmark_config)
+        with DictPoper(benchmark_config, self._logger, self.config_file) as poper:
+            general_config, _ = poper.pop_key("general", required=True, type_check=dict)
+            self._load_general(general_config)
+            translators_config, _ = poper.pop_key("translators", required=True, type_check=list)
+            self._load_translators(translators_config)
+            test_inputs_config, _ = poper.pop_key("testInputs", required=True, type_check=list)
+            self._load_test_inputs(test_inputs_config)
+            test_suites_config, _ = poper.pop_key("testSuites", required=True, type_check=list)
+            self._load_test_suites(test_suites_config)
 
-        if benchmark_config:
-            self.log_unknown_keys(benchmark_config)
+            if poper.errors_occured or self._load_errors_occured:
+                self.test_inputs.clear()
+                TestInput.translators.clear()
+                self.test_suites.clear()
+                raise ConfigException("Errors occured in config. See log warnings and errors")
+        self._logger.info("Config parsed successfully")
 
-        if self._load_errors_occured:
-            self.test_inputs.clear()
-            TestInput.translators.clear()
-            self.test_suites.clear()
-            raise ConfigException("Errors occured in config. see log warnings and errors")
+    def _load_general(self, general_config: Dict) -> NoReturn:
+        with DictPoper(general_config, self._logger, "[general]", copy.deepcopy(general_config)) as poper:
+            self.log_file, _ = poper.pop_key(variable="log_file",
+                                             default=self.log_file,
+                                             required=False,
+                                             type_check=str)
 
-    @Decorators.log_scope("general")
-    def _load_general(self, config: Dict):
-        general_config = config.pop("general", None)
-        if general_config is None:
-            return
+            self.output_dir, _ = poper.pop_key(variable="output_dir",
+                                               default=self.output_dir,
+                                               required=False,
+                                               type_check=str)
+            # todo check is is writeable (should be dir or file?
 
-        # used for logging only
-        general_config_copy = copy.deepcopy(general_config)
-
-        error_occured = False
-        self.log_file, ok = self._pop_key(source=general_config,
-                                          variable="log_file",
-                                          context=general_config_copy,
-                                          default=self.log_file,
-                                          required=False,
-                                          type_check=str)
-        error_occured |= not ok
-
-        self.output_dir, ok = self._pop_key(source=general_config,
-                                            variable="output_dir",
-                                            context=general_config_copy,
-                                            default=self.output_dir,
-                                            required=False,
-                                            type_check=str)
-        error_occured |= not ok
-        # todo check is is writeable (should be dir or file?
-
-        if general_config:
-            self.log_unknown_keys(general_config, general_config_copy)
-
-    @Decorators.log_scope("translators")
-    def _load_translators(self, config: Dict):
-        # todo: handle multiple translators for one format
-        translators_config, ok = self._pop_key(source=config,
-                                               variable="translators",
-                                               context=config,
-                                               required=True,
-                                               type_check=list)
-
-        if not ok:
-            return
-
+    def _load_translators(self, translators_config: List) -> NoReturn:
         for translator_config in translators_config:
             # for error reporting
-            translator_config_copy = copy.deepcopy(translator_config)
+            with DictPoper(translator_config, self._logger, "[[translators]]",
+                           copy.deepcopy(translator_config)) as poper:
+                from_format, _ = poper.pop_key(variable="from_format",
+                                               required=True,
+                                               type_check=str)
 
-            error_occured = False
-            from_format, ok = self._pop_key(source=translator_config,
-                                            variable="from_format",
-                                            context=translator_config_copy,
-                                            required=True,
-                                            type_check=str)
-            error_occured |= not ok
+                to_format, _ = poper.pop_key(variable="to_format",
+                                             required=True,
+                                             type_check=str)
 
-            to_format, ok = self._pop_key(source=translator_config,
-                                          variable="to_format",
-                                          context=translator_config_copy,
-                                          required=True,
-                                          type_check=str)
-            error_occured |= not ok
+                options, _ = poper.pop_key(variable="options",
+                                           default=[],
+                                           required=False,
+                                           type_check=list)
 
-            options, ok = self._pop_key(source=translator_config,
-                                        variable="options",
-                                        context=translator_config_copy,
-                                        default=[],
-                                        required=False,
-                                        type_check=list)
-            error_occured |= not ok
+                input_after_option, _ = poper.pop_key(variable="input_after_option",
+                                                      required=False,
+                                                      type_check=str)
 
-            input_after_option, ok = self._pop_key(source=translator_config,
-                                                   variable="input_after_option",
-                                                   context=translator_config_copy,
-                                                   required=False,
-                                                   type_check=str)
-            error_occured |= not ok
+                input_as_last_argument, _ = poper.pop_key(variable="input_as_last_argument",
+                                                          required=False,
+                                                          type_check=bool)
 
-            input_as_last_argument, ok = self._pop_key(source=translator_config,
-                                                       variable="input_as_last_argument",
-                                                       context=translator_config_copy,
+                output_after_option, _ = poper.pop_key(variable="output_after_option",
                                                        required=False,
-                                                       type_check=bool)
-            error_occured |= not ok
+                                                       type_check=str)
 
-            output_after_option, ok = self._pop_key(source=translator_config,
-                                                    variable="output_after_option",
-                                                    context=translator_config_copy,
-                                                    required=False,
-                                                    type_check=str)
-            error_occured |= not ok
+                executable, _ = poper.pop_key(variable="executable",
+                                              required=True,
+                                              type_check=str)
 
-            executable, ok = self._pop_key(source=translator_config,
-                                           variable="executable",
-                                           context=translator_config_copy,
-                                           required=True,
-                                           type_check=str)
-            error_occured |= not ok
+                path, _ = poper.pop_key(variable="PATH",
+                                        default=None,
+                                        type_check=str)
 
-            path, ok = self._pop_key(source=translator_config,
-                                     variable="PATH",
-                                     context=translator_config_copy,
-                                     default=None,
-                                     type_check=str)
-            error_occured |= not ok
-
-            if not error_occured:
+                if poper.errors_occured:
+                    continue
+            try:
                 translator = Translator(from_format=from_format,
                                         to_format=to_format,
                                         executable=executable,
@@ -195,303 +182,205 @@ class Config:
                                         input_after_option=input_after_option,
                                         output_after_option=output_after_option,
                                         PATH=path)
-                try:
-                    translator.verify()
-                except FileNotFoundError:
-                    self.log_error(f"executable not found: {translator.executable}", translator_config_copy)
-                except BenchmarkException as e:
-                    self.log_error(e, translator_config_copy)
+                translator.verify()
+            except BenchmarkException as e:
+                self._error(e)
+            else:
+                if any(translator.to_format == i.to_format for i in TestInput.translators):
+                    self._logger.warning(
+                        f"Multiple translators with the same output format are not supported, "
+                        f"skipping {translator}")
                 else:
                     TestInput.translators.append(translator)
 
-            if translator_config:
-                self.log_unknown_keys(translator_config, translator_config_copy)
-
-    @Decorators.log_scope("testInputs")
-    def _load_test_inputs(self, config: Dict):
+    def _load_test_inputs(self, test_inputs_config: Dict) -> NoReturn:
         # test_inputs_config = config.pop("testInputs", None)
-        test_inputs_config, ok = self._pop_key(source=config,
-                                               variable="testInputs",
-                                               context=config,
-                                               required=True,
-                                               type_check=list)
-        if not ok:
-            self._logger.error("You must define at least one testInput")
+        if not test_inputs_config:
+            self._error("You must define at least one testInput")
             return
 
         for test_input_config in test_inputs_config:
-            # for error reporting
-            test_input_config_copy = copy.deepcopy(test_input_config)
+            with DictPoper(test_input_config, self._logger, "[[testInputs]]",
+                           copy.deepcopy(test_input_config)) as poper:
+                name, _ = poper.pop_key(variable="name",
+                                        required=True,
+                                        type_check=str)
 
-            error_occured = False
-            name, ok = self._pop_key(source=test_input_config,
-                                     variable="name",
-                                     context=test_input_config_copy,
-                                     required=True, type_check=str)
-            error_occured |= not ok
+                path, _ = poper.pop_key(variable="path",
+                                        required=True,
+                                        type_check=str)
 
-            path, ok = self._pop_key(source=test_input_config,
-                                     variable="path",
-                                     context=test_input_config_copy,
-                                     required=True,
-                                     type_check=str)
-            error_occured |= not ok
+                format, _ = poper.pop_key(variable="format",
+                                          required=True,
+                                          type_check=str)
 
-            format, ok = self._pop_key(source=test_input_config,
-                                       variable="format",
-                                       context=test_input_config_copy,
-                                       required=True,
-                                       type_check=str)
-            error_occured |= not ok
+                patterns, _ = poper.pop_key(variable="files",
+                                            required=True,
+                                            type_check=list)
 
-            patterns, ok = self._pop_key(source=test_input_config,
-                                         variable="files",
-                                         context=test_input_config_copy,
-                                         required=True,
-                                         type_check=list)
-            error_occured |= not ok
+                files = []
+                for pattern in patterns:
+                    wildcard = os.path.join(path, pattern)
+                    resolved_paths = glob.glob(wildcard, recursive=True)
+                    resolved_files = [resolved_path for resolved_path in resolved_paths if
+                                      os.path.isfile(resolved_path)]
+                    if resolved_files:
+                        files.extend(resolved_files)
+                        self._logger.debug(f"{wildcard} matched files: {resolved_files}")
+                    else:
+                        self._logger.warning(f"pattern {wildcard} did not match any file")
 
-            files = []
-            for pattern in patterns:
-                wildcard = os.path.join(path, pattern)
-                resolved_paths = glob.glob(wildcard, recursive=True)
-                resolved_files = [resolved_path for resolved_path in resolved_paths if os.path.isfile(resolved_path)]
-                if resolved_files:
-                    files.extend(resolved_files)
-                    self._logger.debug(f"{wildcard} matched files: {resolved_files}")
-                else:
-                    self.log_warning(f"pattern {wildcard} did not match any file")
+                if not files:
+                    self._error(f"no file defined for testInput")
+                    continue
 
-            if not files:
-                self.log_error(f"no file defined for testInput", test_input_config_copy)
+                if poper.errors_occured:
+                    continue
 
-            if not error_occured:
+            try:
                 test_input = TestInput(name=name,
                                        path=path,
                                        format=format,
                                        files=files)
+                test_input.verify()
+            except BenchmarkException as e:
+                self._error(e)
+            else:
                 self.test_inputs.append(test_input)
 
-            if test_input_config:
-                self.log_unknown_keys(test_input_config, test_input_config_copy)
-
-    @Decorators.log_scope("testSuites")
-    def _load_test_suites(self, config: Dict):
-        test_suites_config = config.pop("testSuites", None)
+    def _load_test_suites(self, test_suites_config: Dict) -> NoReturn:
         if test_suites_config is None:
-            self._logger.error("You must define at least one testSuite")
+            self._error("You must define at least one testSuite")
             return
 
         for test_suite_config in test_suites_config:
             # for error reporting
-            test_suite_config_copy = copy.deepcopy(test_suite_config)
+            with DictPoper(test_suite_config, self._logger, "[[testSuites]]",
+                           copy.deepcopy(test_suite_config)) as poper:
+                name, _ = poper.pop_key(variable="name",
+                                        required=True,
+                                        type_check=str)
 
-            error_occured = False
-            name, ok = self._pop_key(source=test_suite_config,
-                                     variable="name",
-                                     context=test_suite_config_copy,
-                                     required=True,
-                                     type_check=str)
-            error_occured |= not ok
+                executable, _ = poper.pop_key(variable="executable",
+                                              required=True,
+                                              type_check=str)
 
-            executable, ok = self._pop_key(source=test_suite_config,
-                                           variable="executable",
-                                           context=test_suite_config_copy,
-                                           required=True,
+                PATH, _ = poper.pop_key(variable="PATH",
+                                        required=False,
+                                        type_check=str)
+
+                version, _ = poper.pop_key(variable="version",
+                                           required=False,
                                            type_check=str)
-            error_occured |= not ok
 
-            PATH, ok = self._pop_key(source=test_suite_config,
-                                     variable="PATH",
-                                     context=test_suite_config_copy,
-                                     required=False,
-                                     type_check=str)
-            error_occured |= not ok
+                static_options, _ = poper.pop_key(variable="options",
+                                                  default=[],
+                                                  type_check=list,
+                                                  required=False)
 
-            version_option, ok = self._pop_key(source=test_suite_config,
-                                               variable="version_option",
-                                               context=test_suite_config_copy,
-                                               default="",
-                                               required=False,
-                                               type_check=str)
-            error_occured |= not ok
+                if poper.errors_occured:
+                    continue
 
-            static_options, ok = self._pop_key(source=test_suite_config,
-                                               variable="options",
-                                               context=test_suite_config_copy,
-                                               default=[],
-                                               type_check=list,
-                                               required=False)
-            error_occured |= not ok
+                try:
+                    test_suite = TestSuite(name=name,
+                                           PATH=PATH,
+                                           version=version,
+                                           executable=executable,
+                                           options=static_options,
+                                           test_inputs=self.test_inputs)
+                    self._load_test_cases(test_suite_config, test_suite)
+                    test_suite.verify()
+                except BenchmarkException as e:
+                    self._error(e)
+                else:
+                    self.test_suites.append(test_suite)
 
-            test_cases = self._load_test_cases(test_suite_config)
-
-            if not error_occured:
-                test_suite = TestSuite(name=name,
-                                       PATH=PATH,
-                                       version_option=version_option,
-                                       executable=executable,
-                                       options=static_options,
-                                       test_cases=test_cases)
-                test_suite.verify()
-                self.test_suites.append(test_suite)
-
-            if test_suite_config:
-                self.log_unknown_keys(test_suite_config, test_suite_config_copy)
-
-    @Decorators.log_scope("testCases")
-    def _load_test_cases(self, config: Dict):
+    def _load_test_cases(self, config: Dict, test_suite: TestSuite) -> NoReturn:
         test_cases_config = config.pop("testCases", None)
         if test_cases_config is None:
-            self._logger.error("You must define at least one testCase")
+            self._error("You must define at least one testCase")
             return
 
-        test_cases = []
         for test_case_config in test_cases_config:
-            test_case_config_copy = copy.deepcopy(test_case_config)
-
-            error_occured = False
-            name, ok = self._pop_key(source=test_case_config,
-                                     variable="name",
-                                     context=test_case_config_copy,
-                                     required=True,
-                                     type_check=str)
-            error_occured |= not ok
-
-            input_as_stdin, ok = self._pop_key(source=test_case_config,
-                                               variable="input_as_stdin",
-                                               context=test_case_config_copy,
-                                               required=False,
-                                               type_check=bool)
-            error_occured |= not ok
-
-            input_as_last_arg, ok = self._pop_key(source=test_case_config,
-                                                  variable="input_as_last_argument",
-                                                  context=test_case_config_copy,
-                                                  required=False,
-                                                  type_check=bool)
-            error_occured |= not ok
-
-            input_after_option, ok = self._pop_key(source=test_case_config,
-                                                   variable="input_after_option",
-                                                   context=test_case_config_copy,
-                                                   required=False,
-                                                   type_check=str)
-            error_occured |= not ok
-
-            if not input_as_stdin and not input_as_last_arg and not input_after_option:
-                self.log_error(f"input_as_stdin or input_as_last_arg or input_after_option must be defined",
-                               test_case_config_copy)
-
-            exclude, ok = self._pop_key(source=test_case_config,
-                                        variable="exclude",
-                                        context=test_case_config_copy,
-                                        default=[],
-                                        required=False,
-                                        type_check=list)
-            error_occured |= not ok
-
-            if ok:
-                for test_input_name in exclude:
-                    if not any(test_input_name == test_input.name for test_input in self.test_inputs):
-                        self.log_warning(f"exclude: there is no testInput called {test_input_name}",
-                                         test_case_config_copy)
-
-            include_only, ok = self._pop_key(source=test_case_config,
-                                             variable="include_only",
-                                             context=test_case_config_copy,
-                                             default=[],
-                                             required=False,
-                                             type_check=list)
-            error_occured |= not ok
-
-            if exclude and include_only:
-                self.log_error(f"exclude and include_only are mutually exclusive", test_case_config_copy)
-
-            if ok:
-                for test_input_name in include_only:
-                    if not any(test_input_name == test_input.name for test_input in self.test_inputs):
-                        self.log_warning(f"include_only: there is no testInput called {test_input_name}",
-                                         test_case_config_copy)
-
-            format, ok = self._pop_key(source=test_case_config,
-                                       variable="format",
-                                       context=test_case_config_copy,
-                                       required=True,
-                                       type_check=str)
-            error_occured |= not ok
-
-            # note: TestInput is assumed to be tptp
-            # todo support chaining translators
-            if ok:
-                if not any(translator.to_format == format for translator in TestInput.translators):
-                    self.log_warning(f"format {format} is not achievable with defined translators: ",
-                                     TestInput.translators)
-
-            # nested list
-            options, ok = self._pop_key(source=test_case_config,
-                                        variable="options",
-                                        context=test_case_config_copy,
+            with DictPoper(test_case_config, self._logger, "[[testSuites.testCases]]",
+                           copy.deepcopy(test_case_config)) as poper:
+                name, _ = poper.pop_key(variable="name",
                                         required=True,
-                                        type_check=list)
-            error_occured |= not ok
+                                        type_check=str)
 
-            if not error_occured:
+                input_as_last_arg, _ = poper.pop_key(variable="input_as_last_argument",
+                                                     required=False,
+                                                     type_check=bool)
+
+                input_after_option, _ = poper.pop_key(variable="input_after_option",
+                                                      required=False,
+                                                      type_check=str)
+
+                exclude, ok = poper.pop_key(variable="exclude",
+                                            default=[],
+                                            required=False,
+                                            type_check=list)
+
+                if ok:
+                    for test_input_name in exclude:
+                        if not any(test_input_name == test_input.name for test_input in test_suite.test_inputs):
+                            self._error(f"exclude: there is no testInput called {test_input_name}")
+                            poper.errors_occured = True
+
+                include_only, ok = poper.pop_key(variable="include_only",
+                                                 default=[],
+                                                 required=False,
+                                                 type_check=list)
+
+                if ok:
+                    for test_input_name in include_only:
+                        if not any(test_input_name == test_input.name for test_input in test_suite.test_inputs):
+                            self._error(
+                                f"include_only: there is no testInput called {test_input_name} in {poper.log_context}")
+                            poper.errors_occured = True
+
+                format, ok = poper.pop_key(variable="format",
+                                           required=True,
+                                           type_check=str)
+
+                # note: TestInput is assumed to be tptp
+                # todo support chaining translators
+                if ok and not any(translator.to_format == format for translator in TestInput.translators):
+                    self._error(f"format {format} is not achievable with defined translators: {TestInput.translators}")
+
+                # nested list
+                options, _ = poper.pop_key(variable="options",
+                                           required=True,
+                                           type_check=list)
+
+                if poper.errors_occured:
+                    continue
+
+            try:
                 test_case = TestCase(name=name,
                                      format=format,
-                                     input_as_stdin=input_as_stdin,
-                                     input_as_last_argument=input_as_last_arg,
                                      input_after_option=input_after_option,
+                                     input_as_last_argument=input_as_last_arg,
                                      exclude=exclude,
                                      include_only=include_only,
                                      options=options)
-                test_cases.append(test_case)
+                test_case.verify(test_suite)
+            except BenchmarkException as e:
+                self._error(e)
+                # self._logger.error(f"{e.args[0]} in {e.args[1:]}")
+            else:
+                test_suite.test_cases.append(test_case)
 
-            if test_case_config:
-                self.log_unknown_keys(test_case_config, test_case_config_copy)
-
-        return test_cases
-
-    def log_error(self, message, context=""):
+    def _error(self, message):
         self._load_errors_occured = True
-        if context:
-            context = f"\ndetails:{context}"
-        self._logger.error(f"In {'.'.join(self._log_scope)}: {message} {context}")
+        if isinstance(message, Exception):
+            log = f"{message.args[0]}"
+            if message.args[1:]:
+                log = f"{log} in {' '.join(map(str, message.args[1:]))}"
+            self._logger.error(log)
+        else:
+            self._logger.error(message)
 
-    def log_warning(self, message, context=""):
-        if context:
-            context = f"\ndetails:{context}"
-        self._logger.warning(f"In {'.'.join(self._log_scope)}: {message} {context}")
-
-    def log_missing_key(self, variable_name, contex):
-        message = f"Missing required key: '{variable_name}'"
-        self.log_error(message, contex)
-
-    def log_unknown_keys(self, config, context=''):
-        message = f"Unknown keys: '{config}'"
-        self.log_warning(message, context=config)
-
-    def _pop_key(self, source: Dict, variable: str, context: any, default: any = None, required: bool = False,
-                 type_check: Type = None):
-        """Remove and return variable from source and:
-        add default value if not in source
-        log error if required and not in source
-        print context on error
-        check type of variable
-        """
-        ok = True
-        value = source.pop(variable, default)
-        if required and value is None:
-            ok = False
-            self.log_missing_key(variable, context)
-
-        if value is not None and type_check is not None and type(value) != type_check:
-            ok = False
-            self._logger.error(f"'{variable}'"
-                               f" should be {type_check.__name__},"
-                               f" but is {type(value).__name__}"
-                               f" in {self.log_scope} {context}")
-        return value, ok
 
 
 if __name__ == "__main__":
