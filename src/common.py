@@ -7,14 +7,11 @@ from typing import List
 from src import BenchmarkException
 
 
-def is_executable(command: List[str], check_return_code: bool = False,
+def is_executable(command: List[str],
+                  check_return_code: bool = False,
                   PATH: str = None) -> typing.NoReturn:
     """Simple check if executable exists
     Not the most efficient implementation (active waiting for timeout)
-
-    :returns True if executable exists
-    :raise FileNotFound if executable is not found
-    :raise subprocess.CalledProcessError if check_return_code is True, and subprocess exits non 0
     """
     env = os.environ.copy()
     if PATH is not None:
@@ -36,8 +33,13 @@ def is_executable(command: List[str], check_return_code: bool = False,
         raise BenchmarkException(f"Command exits non zero: {command}")
 
 
-def execute(command: List[str], input_filename: str, output_filename: str, input_after_option: str = None,
-            input_as_last_argument: str = None, output_after_option: str = None, PATH: str = None):
+def execute(command: List[str],
+            input_filename: str,
+            output_filename: str,
+            input_after_option: str = None,
+            input_as_last_argument: str = None,
+            output_after_option: str = None,
+            PATH: str = None):
     stdin = subprocess.DEVNULL
     stdout = subprocess.DEVNULL
     stderr = subprocess.DEVNULL

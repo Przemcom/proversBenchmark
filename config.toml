@@ -9,36 +9,43 @@ to_format="LADR"
 PATH="../provers/LADR-2009-11A/bin"
 executable="tptp_to_ladr"
 options=[]
-input_after_option="-TPTP"
-input_as_last_argument=false
-output_after_option=""
+#input_after_option="-TPTP"
+#input_as_last_argument=false
+#output_after_option=""
 
 [[testInputs]]
 # for specifying include/exclude in testCase
-name="variableLength"
+name="tptp_files"
 # path to files
-path="."
+path="tests/data/tptp"
 # wildcards supported
-files=["**/*.p"]
+files=["*.p"]
 # currently only TPTP
-format="TPP"
+format="TPTP"
+
+[[testInputs]]
+# for specifying include/exclude in testCase
+name="prover9_files"
+# path to files
+path="tests/data/prover9"
+# wildcards supported
+files=["*.in"]
+# currently only TPTP
+format="LADR"
 
 [[testSuites]]
-name="ls dummy test"
+name="prover9 tests"
 # name available in PATH
-executable="ls"
+executable="prover9"
 # append to path env variable, comment or leave empty to disable
-#PATH="../provers/LADR-2009-11A/bin"
-#PATH="lib/prover9"
-# metadata appended to each file, comment to disable
-version="0.1"
+PATH="../provers/LADR-2009-11A/bin"
+#version=""
 # options always appended to executable, comment or leave empty to disable
-options=["-1"]
-# specify command line options to test
+#options=[""]
 
 [[testSuites.testCases]]
 # metadata
-name="ls witout options"
+name="Prover9 with translator"
 # what file format is accepted by prover, input will be automatically translated if possible
 format="LADR"
 # mutually exclusive options input_as_last_argument, input_after_option
@@ -46,7 +53,7 @@ format="LADR"
 #input_after_option="-o"
 
 # mutually exclusive: include or exclude inputs for test. Comment both to test all
-include_only=["variableLength"]
+include_only=["prover9_files"]
 #exclude=[""]
 
 # list of options to test,
@@ -54,6 +61,7 @@ include_only=["variableLength"]
 options=[]
 
 [[testSuites.testCases]]
-name="ls -Auto2"
+name="Prover9 with -x"
 format="LADR"
-options=["-a", "-l"]
+options=["-x"]
+exclude=["prover9_files"]

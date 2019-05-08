@@ -8,9 +8,8 @@ from typing import List, Dict, Type, NoReturn
 
 import toml
 
-from src import BenchmarkException, ConfigException
-from src.test import TestCase, TestSuite
-from src.testinput import TestInput
+from src import BenchmarkException, ConfigException, cwd
+from src.test import TestCase, TestSuite, TestInput
 from src.translators import Translator
 
 # todo remove this and make proper logger
@@ -167,7 +166,7 @@ class Config:
                                               required=True,
                                               type_check=str)
 
-                path, _ = poper.pop_key(variable="PATH",
+                PATH, _ = poper.pop_key(variable="PATH",
                                         default=None,
                                         type_check=str)
 
@@ -181,7 +180,7 @@ class Config:
                                         input_as_last_argument=input_as_last_argument,
                                         input_after_option=input_after_option,
                                         output_after_option=output_after_option,
-                                        PATH=path)
+                                        PATH=PATH)
                 translator.verify()
             except BenchmarkException as e:
                 self._error(e)
@@ -219,16 +218,23 @@ class Config:
                                             type_check=list)
 
                 files = []
+                prefix = path if os.path.isabs(path) else os.path.join(cwd, path)
                 for pattern in patterns:
-                    wildcard = os.path.join(path, pattern)
+                    wildcard = os.path.join(prefix, pattern)
                     resolved_paths = glob.glob(wildcard, recursive=True)
-                    resolved_files = [resolved_path for resolved_path in resolved_paths if
-                                      os.path.isfile(resolved_path)]
-                    if resolved_files:
-                        files.extend(resolved_files)
-                        self._logger.debug(f"{wildcard} matched files: {resolved_files}")
+
+                    resolved_files = []
+                    for resolved_path in resolved_paths:
+                        if not os.path.isfile(resolved_path):
+                            self._logger.warning(f"skipping {resolved_path} from {pattern} - is not a file")
+                            continue
+                        # remove prefix, store file as relative to prefix
+                        resolved_files.append(resolved_path[len(prefix) + 1:])
+
+                    if not resolved_files:
+                        self._logger.warning(f"pattern '{wildcard}' did not match any file")
                     else:
-                        self._logger.warning(f"pattern {wildcard} did not match any file")
+                        files.extend(resolved_files)
 
                 if not files:
                     self._error(f"no file defined for testInput")
@@ -239,7 +245,7 @@ class Config:
 
             try:
                 test_input = TestInput(name=name,
-                                       path=path,
+                                       path=prefix,
                                        format=format,
                                        files=files)
                 test_input.verify()
@@ -324,7 +330,7 @@ class Config:
                 if ok:
                     for test_input_name in exclude:
                         if not any(test_input_name == test_input.name for test_input in test_suite.test_inputs):
-                            self._error(f"exclude: there is no testInput called {test_input_name}")
+                            self._error(f"exclude: there is no [[testInput]] named {test_input_name}")
                             poper.errors_occured = True
 
                 include_only, ok = poper.pop_key(variable="include_only",
@@ -336,7 +342,7 @@ class Config:
                     for test_input_name in include_only:
                         if not any(test_input_name == test_input.name for test_input in test_suite.test_inputs):
                             self._error(
-                                f"include_only: there is no testInput called {test_input_name} in {poper.log_context}")
+                                f"include_only: there is no [[testInput]] named {test_input_name} in {poper.log_context}")
                             poper.errors_occured = True
 
                 format, ok = poper.pop_key(variable="format",
@@ -380,7 +386,6 @@ class Config:
             self._logger.error(log)
         else:
             self._logger.error(message)
-
 
 
 if __name__ == "__main__":

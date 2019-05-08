@@ -1,5 +1,7 @@
 import argparse
+from pprint import pprint
 
+from src.benchmark import Benchmark
 from src.config import Config
 
 
@@ -19,3 +21,11 @@ if __name__ == '__main__':
 
     config = Config(config_file=args.file)
     config.load_config()
+
+    benchmark = Benchmark(test_suite=config.test_suites)
+    print("Result: ")
+    stats = benchmark.run()
+    for testcase in stats.test_suites[0].test_cases:
+        print("testCase: ", end='')
+        pprint(testcase.__dict__)
+    print(stats.hardware)
