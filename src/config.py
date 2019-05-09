@@ -89,7 +89,7 @@ class Config:
         self._logger.setLevel(logging.DEBUG)
 
     def load_config(self) -> NoReturn:
-        """Load and verify config"""
+        """Load and config"""
         self._load_errors_occured = False
         if not os.path.isfile(self.config_file):
             self._error(f"Config file '{self.config_file}'' is not found/not a file")
@@ -177,7 +177,6 @@ class Config:
                                         input_after_option=input_after_option,
                                         output_after_option=output_after_option,
                                         PATH=PATH)
-                translator.verify()
             except BenchmarkException as e:
                 self._error(e)
             else:
@@ -244,7 +243,6 @@ class Config:
                                        path=prefix,
                                        format=format,
                                        files=files)
-                test_input.verify()
             except BenchmarkException as e:
                 self._error(e)
             else:
@@ -291,7 +289,6 @@ class Config:
                                            options=(option.strip() for option in static_options),
                                            test_inputs=self.test_inputs)
                     self._load_test_cases(test_suite_config, test_suite)
-                    test_suite.verify()
                 except BenchmarkException as e:
                     self._error(e)
                 else:
@@ -366,7 +363,6 @@ class Config:
                                      exclude=exclude,
                                      include_only=include_only,
                                      options=options)
-                test_case.verify(test_suite)
             except BenchmarkException as e:
                 self._error(e)
                 # self._logger.error(f"{e.args[0]} in {e.args[1:]}")

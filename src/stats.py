@@ -11,58 +11,64 @@ import psutil as psutil
 from src import logger
 
 
+@dataclass
+class ExecutionStatistics:
+    # todo which cpu times do we need?
+    cpu_time = None
+    execution_time: float = 0
+    peak_memory: int = None
+    disk_reads: int = None
+    disk_writes: int = None
+    _update_io = True
+
+    def disable_io(self):
+        self._update_io = False
+
+    def update(self, proc: psutil.Process):
+        if self._update_io:
+            io_counters = proc.io_counters()
+            self.disk_reads = io_counters.read_bytes + io_counters.read_chars
+            self.disk_writes = io_counters.write_bytes + io_counters.read_chars
+
+        mem_info = proc.memory_info()
+        if self.peak_memory is None or self.peak_memory < mem_info.rss:
+            self.peak_memory = mem_info.rss
+
+        self.cpu_time = proc.cpu_times()
+
+
 class MonitoredProcess(subprocess.Popen):
 
     def __init__(self, *args, **kwargs):
-        # todo which cpu times do we need?
-        self.cpu_time = None
-        self.execution_time = None
-        self.peak_memory = 0
-        self._has_permission = True
+        self.exec_stats = ExecutionStatistics()
         try:
             psutil.Process().io_counters()
-            self.disk_reads = 0
-            self.disk_writes = 0
         except psutil.AccessDenied:
             logger.warning("Can not disk IO info - permission denied")
-            # must me sudo to get disk io info
-            self._has_permission = False
-            self.disk_reads = None
-            self.disk_writes = None
+            self.exec_stats.disable_io()
 
         super().__init__(*args, **kwargs)
-        self.proc = psutil.Process(self.pid)
         self._start = time.time()
+        self.proc = psutil.Process(self.pid)
         self.poll()
-
-    def __enter__(self):
-        self.disk_reads = 0
-        self.disk_writes = 0
-        self.peak_memory = 0
-        return self
 
     def poll(self):
         if super().poll() is not None:
             return super().poll()
 
         # can not do it in __exit__, because process no longer not exists there
-        if self._has_permission:
-            io_counters = self.proc.io_counters()
-            self.disk_reads = io_counters.read_bytes + io_counters.read_chars
-            self.disk_writes = io_counters.write_bytes + io_counters.read_chars
+        self.exec_stats.update(self.proc)
 
-        mem_info = self.proc.memory_info()
-        if self.peak_memory < mem_info.rss:
-            self.peak_memory = mem_info.rss
-
-        self.cpu_time = self.proc.cpu_times()
         return None
 
     def stop(self):
         self.__exit__(None, None, None)
 
+    def get_statistics(self) -> ExecutionStatistics:
+        return self.exec_stats
+
     def __exit__(self, exc_type, exc_val, exc_tb):
-        self.execution_time = time.time() - self._start
+        self.exec_stats.execution_time = time.time() - self._start
 
 
 class SATType(Enum):
@@ -127,13 +133,7 @@ class OutputStatistics:
 class TestCaseStatistics:
     name: str
     command: List[str]
-    execution_time: int = None
-    # todo add type hint
-    cpu_time = None
-    peak_memory = 0
-    disk_writes = 0
-    disk_reads = 0
-
+    execution_statistics: ExecutionStatistics = None
     input: SATStatistics = None
     output: OutputStatistics = None
 
@@ -150,3 +150,14 @@ class Statistics:
     test_suites: List[TestSuiteStatistics] = field(default_factory=list)
     date: datetime.datetime = datetime.datetime.now()
     hardware: HardwareStatistics = HardwareStatistics()
+
+
+if __name__ == '__main__':
+    import functools
+
+    proc = functools.partial(MonitoredProcess, ['sleep', '5'])
+    with proc() as running_process:
+        while running_process.poll():
+            time.sleep(0.1)
+
+    print(running_process.get_statistics())

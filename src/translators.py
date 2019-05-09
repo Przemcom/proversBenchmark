@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from typing import List
 
 from src import BenchmarkException, cwd, logger
-from src._common import is_executable, execute
+from src._common import execute
 
 
 @dataclass
@@ -32,26 +32,16 @@ class Translator:
         if not os.path.isdir(self.PATH):
             raise BenchmarkException(f"PATH '{self.PATH}' is not a directory", self)
 
-    def verify(self):
-        """Simple check if executable exists
-        todo exception handling may be better
-        """
         if self.input_after_option and self.input_as_last_argument:
             raise BenchmarkException("Options input_after_option and input_as_last_argument are mutually exclusive",
                                      self)
-        command = [self.executable]
-        command.extend(self.options)
-        return is_executable(command=command, PATH=self.PATH)
 
     def translate(self, input_filename: str, output_filename: str) -> subprocess.Popen:
         command = self.get_command(input_filename, output_filename)
         logger.info(f"Translating {input_filename} from {self.from_format} to {self.to_format} to {output_filename}")
         return execute(command=command,
-                       input_filename=input_filename,
-                       output_filename=output_filename,
-                       input_after_option=self.input_after_option,
-                       input_as_last_argument=self.input_as_last_argument,
-                       output_after_option=self.output_after_option,
+                       stdin=input_filename,
+                       stdout=output_filename,
                        PATH=self.PATH)
 
     def get_command(self, input_filename: str, output_filename: str) -> List[str]:
@@ -75,4 +65,3 @@ if __name__ == '__main__':
                    to_format="LADR",
                    executable="cat",
                    )
-    v = t.verify()

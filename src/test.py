@@ -9,9 +9,8 @@ from dataclasses import dataclass, field
 from typing import List, ClassVar, Generator
 
 from src import BenchmarkException, cwd, logger
-from src._common import is_executable
-from src.stats import TestSuiteStatistics, TestCaseStatistics, SATStatistics, SATStatus, OutputStatistics, \
-    MonitoredProcess
+from src._common import execute
+from src.stats import TestSuiteStatistics, TestCaseStatistics, SATStatistics, SATStatus, OutputStatistics
 from src.translators import Translator
 
 
@@ -29,7 +28,6 @@ class TestInput:
         if self.path is not None and not os.path.isabs(self.path):
             self.path = os.path.abspath(os.path.join(cwd, self.path))
 
-    def verify(self):
         for file in self.files:
             if not os.path.isfile(os.path.join(self.path, file)):
                 raise BenchmarkException(f"file {file} does not exists (is not a file)", self)
@@ -59,9 +57,6 @@ class TestSuite:
     def __post_init__(self):
         if self.PATH is not None and not os.path.isabs(self.PATH):
             self.PATH = os.path.abspath(os.path.join(cwd, self.PATH))
-
-    def verify(self):
-        is_executable(command=[self.executable], PATH=self.PATH)
 
         # todo check if all formats are achievable (static method?) also unify this with Config
 
@@ -96,35 +91,6 @@ class TestCase:
 
         if self.exclude and self.include_only:
             raise BenchmarkException(f"exclude and include_only are mutually exclusive", self)
-
-    def verify(self, test_suite: TestSuite):
-        """Dry run: check if all arguments can be executed"""
-        # todo implement. It is hard, because we must generate everything to verify
-        test_inputs = self.filter_inputs(test_suite.test_inputs)
-
-        if not test_inputs:
-            raise BenchmarkException("no input defined for this test case", test_suite, self)
-
-        env = os.environ.copy()
-        if test_suite.PATH is not None:
-            env["PATH"] = test_suite.PATH + ":" + env["PATH"]
-
-        # no need to test all inputs, just pick one
-        test_input = test_inputs[0]
-
-        command = self.build_command(test_suite.executable, test_input, test_suite.options)
-        # return execute(command=command,
-        #                input_filename=??,
-        #                output_filename=None,  # self.output_filename,
-        #                input_after_option=self.input_after_option,
-        #                input_as_last_argument=self.input_as_last_argument,
-        #                output_after_option=None,  # self.output_after_option,
-        #                PATH=test_suite.PATH)
-        try:
-            is_executable(command, PATH=test_suite.PATH, check_return_code=True)
-        except FileNotFoundError as e:
-            # should not happen at this point, should have been checked in test suite
-            raise BenchmarkException(f"Command not found: {command}", test_suite, self)
 
     def build_command(self, executable: str, input_filepath: str, suite_options: List[str] = None) -> List[str]:
         # todo respect self.format (automatically convert)
@@ -163,34 +129,22 @@ class TestCase:
             command = self.build_command(executable=executable,
                                          input_filepath=input_filepath,
                                          suite_options=options)
-            test_case_stats = TestCaseStatistics(name=self.name, command=command, input=input_statistics)
-
-            stdin = subprocess.DEVNULL
-            stdout = subprocess.PIPE
-            stderr = subprocess.PIPE
-            if not self.input_after_option and not self.input_as_last_argument:
-                stdin = open(input_filepath, 'r')
-
-            env = os.environ
-            if PATH is not None:
-                env["PATH"] = PATH + ":" + env["PATH"]
-
             # todo ctr+c skips testcase?
             # process may execute too quick to get statistics
             logger.info(f"Running testcase '{self.name}' with '{input_filepath}': {command}")
-            with MonitoredProcess(command,
-                                  stdin=stdin,
-                                  stdout=stdout,
-                                  stderr=stderr,
-                                  env=env,
-                                  text=True) as proc:
+            with execute(command,
+                         stdin=input_filepath,
+                         stdout=subprocess.PIPE,
+                         stderr=subprocess.PIPE,
+                         PATH=PATH,
+                         monitored=True,
+                         text=True) as proc:
                 while proc.poll() is None:
                     time.sleep(0.05)
-            test_case_stats.execution_time = proc.execution_time
-            test_case_stats.cpu_time = proc.cpu_time
-            test_case_stats.peak_memory = proc.peak_memory
-            test_case_stats.disk_reads = proc.disk_reads
-            test_case_stats.disk_writes = proc.disk_writes
+            test_case_stats = TestCaseStatistics(name=self.name,
+                                                 command=command,
+                                                 input=input_statistics,
+                                                 execution_statistics=proc.get_statistics())
 
             out_stats = OutputStatistics(returncode=proc.returncode)
             out_stats.output, out_stats.error = proc.communicate()
