@@ -1,4 +1,5 @@
 import datetime
+import json
 import platform
 import subprocess
 import time
@@ -6,13 +7,23 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import List
 
-import psutil as psutil
+import psutil
 
 from src import logger
 
 
+def JsonDefault(obj):
+    if isinstance(obj, Serializable):
+        return obj.as_dict()
+
+
+class Serializable:
+    def as_dict(self):
+        return self.__dict__
+
+
 @dataclass
-class ExecutionStatistics:
+class ExecutionStatistics(Serializable):
     # todo which cpu times do we need?
     cpu_time = None
     execution_time: float = 0
@@ -79,7 +90,7 @@ class SATType(Enum):
 
 
 @dataclass
-class CPUStatistics:
+class CPUStatistics(Serializable):
     name: str = platform.processor()
     min_frequency: float = psutil.cpu_freq().min
     max_frequency: float = psutil.cpu_freq().max
@@ -88,7 +99,7 @@ class CPUStatistics:
 
 
 @dataclass
-class HardwareStatistics:
+class HardwareStatistics(Serializable):
     system: str = platform.system()
     release: str = platform.release()
     version: str = platform.version()
@@ -97,7 +108,7 @@ class HardwareStatistics:
 
 
 @dataclass
-class SATStatistics:
+class SATStatistics(Serializable):
     name: str = None
     path: str = None
     # list of commands used to translate
@@ -114,7 +125,7 @@ class SATStatistics:
 
 
 @dataclass
-class SATStatus:
+class SATStatus(Enum):
     ERROR = "error"
     SATISFIABLE = "satisfiable"
     UNSATISFIABLE = "unsatisfiable"
@@ -122,7 +133,7 @@ class SATStatus:
 
 
 @dataclass
-class OutputStatistics:
+class OutputStatistics(Serializable):
     returncode: int = None
     status: SATStatus = None
     error: str = None
@@ -130,7 +141,7 @@ class OutputStatistics:
 
 
 @dataclass
-class TestCaseStatistics:
+class TestCaseStatistics(Serializable):
     name: str
     command: List[str]
     execution_statistics: ExecutionStatistics = None
@@ -139,14 +150,14 @@ class TestCaseStatistics:
 
 
 @dataclass
-class TestSuiteStatistics:
+class TestSuiteStatistics(Serializable):
     program_name: str
     program_version: str
     test_cases: List[TestCaseStatistics] = field(default_factory=list)
 
 
 @dataclass
-class Statistics:
+class Statistics(Serializable):
     test_suites: List[TestSuiteStatistics] = field(default_factory=list)
     date: datetime.datetime = datetime.datetime.now()
     hardware: HardwareStatistics = HardwareStatistics()

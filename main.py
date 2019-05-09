@@ -1,8 +1,9 @@
 import argparse
-from pprint import pprint
+import json
 
 from src.benchmark import Benchmark
 from src.config import Config
+from src.stats import JsonDefault
 
 
 def parse_args():
@@ -25,7 +26,4 @@ if __name__ == '__main__':
     benchmark = Benchmark(test_suite=config.test_suites)
     print("Result: ")
     stats = benchmark.run()
-    for testcase in stats.test_suites[0].test_cases:
-        print("testCase: ", end='')
-        pprint(testcase.__dict__)
-    print(stats.hardware)
+    print(json.dumps(stats, indent=2, default=JsonDefault))
