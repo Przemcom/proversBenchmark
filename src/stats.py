@@ -158,6 +158,11 @@ class TestSuiteStatistics(Serializable):
 
 @dataclass
 class Statistics(Serializable):
+    def as_dict(self):
+        dict_copy = self.__dict__.copy()
+        dict_copy["date"] = str(self.date)
+        return dict_copy
+
     test_suites: List[TestSuiteStatistics] = field(default_factory=list)
     date: datetime.datetime = datetime.datetime.now()
     hardware: HardwareStatistics = HardwareStatistics()
@@ -171,4 +176,9 @@ if __name__ == '__main__':
         while running_process.poll():
             time.sleep(0.1)
 
-    print(running_process.get_statistics())
+    stats = running_process.get_statistics()
+    test_case_stats = TestCaseStatistics(name="test",
+                                         command=["ps", "-aux"],
+                                         execution_statistics=stats,
+                                         input=SATStatistics())
+    print(json.dumps(test_case_stats, default=JsonDefault))

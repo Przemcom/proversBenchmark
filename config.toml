@@ -6,6 +6,7 @@ log_file="benchmark.log"
 [[translators]]
 from_format="TPTP"
 to_format="LADR"
+extension="in"
 PATH="../provers/LADR-2009-11A/bin"
 executable="tptp_to_ladr"
 options=[]

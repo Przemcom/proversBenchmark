@@ -8,7 +8,7 @@ from typing import List, Dict, Type, NoReturn
 
 import toml
 
-from src import BenchmarkException, ConfigException, cwd
+from src import BenchmarkException, ConfigException
 from src.test import TestCase, TestSuite, TestInput
 from src.translators import Translator
 
@@ -53,6 +53,9 @@ class DictPoper:
             f" should be {type_check.__name__},"
             f" but is {type(value).__name__}"
             self._error(message)
+
+        if type_check == str and value is not None:
+            value = value.strip()
 
         return value, ok
 
@@ -161,6 +164,8 @@ class Config:
                 executable, _ = poper.pop_key(variable="executable",
                                               required=True,
                                               type_check=str)
+                extension, _ = poper.pop_key(variable="extension",
+                                             required=False)
 
                 PATH, _ = poper.pop_key(variable="PATH",
                                         default=None,
@@ -172,6 +177,7 @@ class Config:
                 translator = Translator(from_format=from_format,
                                         to_format=to_format,
                                         executable=executable,
+                                        extension=extension,
                                         options=(option.strip() for option in options),
                                         input_as_last_argument=input_as_last_argument,
                                         input_after_option=input_after_option,
@@ -213,7 +219,7 @@ class Config:
                                             type_check=list)
 
                 files = []
-                prefix = path if os.path.isabs(path) else os.path.join(cwd, path)
+                prefix = path if os.path.isabs(path) else os.path.join(os.getcwd(), path)
                 for pattern in patterns:
                     wildcard = os.path.join(prefix, pattern)
                     resolved_paths = glob.glob(wildcard, recursive=True)

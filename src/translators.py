@@ -1,9 +1,9 @@
 import os
 import subprocess
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, InitVar
 from typing import List
 
-from src import BenchmarkException, cwd, logger
+from src import BenchmarkException, logger
 from src._common import execute
 
 
@@ -19,15 +19,20 @@ class Translator:
     from_format: str
     to_format: str
     executable: str
+    extension: str = None
+    cwd: InitVar[str] = os.getcwd()
     options: List[str] = field(default_factory=list)
     input_after_option: str = None
     input_as_last_argument: bool = False
     output_after_option: str = None
     PATH: str = None
 
-    def __post_init__(self):
+    def __post_init__(self, cwd):
         if self.PATH is not None:
             self.PATH = os.path.abspath(os.path.join(cwd, self.PATH))
+
+        if not self.extension.startswith('.'):
+            self.extension = f".{self.extension}"
 
         if not os.path.isdir(self.PATH):
             raise BenchmarkException(f"PATH '{self.PATH}' is not a directory", self)
@@ -61,7 +66,8 @@ class Translator:
 
 
 if __name__ == '__main__':
-    t = Translator(from_format="TPTP",
-                   to_format="LADR",
-                   executable="cat",
-                   )
+    translator = Translator(from_format="TPTP",
+                            to_format="LADR",
+                            executable="tptp_to_ladr",
+                            PATH="../../provers/LADR-2009-11A/bin")
+    translator.translate(input_filename="../../TPTP-v7.2.0/example.p", output_filename="example_converted.in")

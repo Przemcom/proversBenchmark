@@ -5,10 +5,10 @@ from __future__ import annotations
 import os
 import subprocess
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, InitVar
 from typing import List, ClassVar, Generator
 
-from src import BenchmarkException, cwd, logger
+from src import BenchmarkException, logger
 from src._common import execute
 from src.stats import TestSuiteStatistics, TestCaseStatistics, SATStatistics, SATStatus, OutputStatistics
 from src.translators import Translator
@@ -18,43 +18,68 @@ from src.translators import Translator
 class TestInput:
     name: str
     format: str
+    cwd: str = os.getcwd()
     path: str = None
     files: List[str] = field(default_factory=list)
-    files_statistics: SATStatistics = field(default_factory=list)
 
     translators: ClassVar[List[Translator]] = []
 
     def __post_init__(self):
         if self.path is not None and not os.path.isabs(self.path):
-            self.path = os.path.abspath(os.path.join(cwd, self.path))
+            self.path = os.path.abspath(os.path.join(self.cwd, self.path))
 
         for file in self.files:
             if not os.path.isfile(os.path.join(self.path, file)):
                 raise BenchmarkException(f"file {file} does not exists (is not a file)", self)
 
-    def get_file_statistics(self, file: str) -> SATStatistics:
-        stats = SATStatistics(name=self.name, format=self.format)
+    def get_file_statistics(self, file_path: str) -> SATStatistics:
+        stats = SATStatistics(name=self.name, path=file_path, format=self.format)
         return stats
 
-    def as_format(self, format: str) -> Generator[str, SATStatistics]:
-        # todo return path to file in specific format, translate automatically
+    def as_format(self, desired_format: str) -> Generator[str, SATStatistics]:
+        if desired_format == self.format:
+            for file in self.files:
+                file_path = os.path.abspath(os.path.join(self.path, file))
+                stats = self.get_file_statistics(file_path=file_path)
+                yield file_path, stats
+                return
+
+        # todo support translator chining
+        for translator in TestInput.translators:
+            if translator.from_format == self.format and translator.to_format == desired_format:
+                break
+        else:
+            raise BenchmarkException(f"No translator from {self.format} to {desired_format} found")
+
+        extension = os.path.splitext(self.files[0])[1] if translator.extension is None else translator.extension
         for file in self.files:
-            file_path = os.path.abspath(os.path.join(self.path, file))
-            stats = self.get_file_statistics(file)
-            yield file_path, stats
+            in_file_path = os.path.abspath(os.path.join(self.path, file))
+            out_file_path = self._get_out_filepath(desired_format, file, extension)
+            translator.translate(in_file_path, out_file_path).wait()
+            yield out_file_path, self.get_file_statistics(file_path=out_file_path)
+
+    def _get_out_filepath(self, prefix: str, file: str, extension: str):
+        out_dir = os.path.join(self.cwd, "inputs", self.name, prefix)
+        directory_from_file, filename = os.path.split(file)
+        directory_from_file = os.path.join(out_dir, directory_from_file)
+        if not os.path.exists(directory_from_file):
+            os.makedirs(directory_from_file)
+        return os.path.join(directory_from_file, os.path.splitext(file)[0] + extension)
 
 
 @dataclass
 class TestSuite:
     name: str
     executable: str
+    cwd: InitVar[str] = os.getcwd()
     PATH: str = None
     version: str = None
     options: List[str] = field(default_factory=list)
+    cache_dir: str = "test-inputs"
     test_cases: List[TestCase] = field(default_factory=list)
     test_inputs: List[TestInput] = field(default_factory=list)
 
-    def __post_init__(self):
+    def __post_init__(self, cwd):
         if self.PATH is not None and not os.path.isabs(self.PATH):
             self.PATH = os.path.abspath(os.path.join(cwd, self.PATH))
 
@@ -163,3 +188,19 @@ class TestCase:
             test_case_stats.output = out_stats
 
             yield test_case_stats
+
+
+if __name__ == '__main__':
+    input = TestInput(name="tmp ",
+                      format="TPTP",
+                      path="../../TPTP-v7.2.0",
+                      files=["example.p"])
+    translator = Translator(from_format="TPTP",
+                            to_format="LADR",
+                            executable="tptp_to_ladr",
+                            extension="in",
+                            PATH="../../provers/LADR-2009-11A/bin")
+    TestInput.translators.append(translator)
+    # translator.translate(input_filename="../../TPTP-v7.2.0/example.p", output_filename="example_converted.in")
+    for i in input.as_format("LADR"):
+        print(i)
