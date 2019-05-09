@@ -1,10 +1,10 @@
 import os
 import subprocess
-from dataclasses import dataclass, field, InitVar
+from dataclasses import dataclass, field
 from typing import List
 
-from src import BenchmarkException, cwd
-from src.common import is_executable, execute
+from src import BenchmarkException, cwd, logger
+from src._common import is_executable, execute
 
 
 @dataclass
@@ -39,10 +39,13 @@ class Translator:
         if self.input_after_option and self.input_as_last_argument:
             raise BenchmarkException("Options input_after_option and input_as_last_argument are mutually exclusive",
                                      self)
-        return is_executable(command=[self.executable], PATH=self.PATH)
+        command = [self.executable]
+        command.extend(self.options)
+        return is_executable(command=command, PATH=self.PATH)
 
     def translate(self, input_filename: str, output_filename: str) -> subprocess.Popen:
         command = self.get_command(input_filename, output_filename)
+        logger.info(f"Translating {input_filename} from {self.from_format} to {self.to_format} to {output_filename}")
         return execute(command=command,
                        input_filename=input_filename,
                        output_filename=output_filename,
@@ -73,5 +76,3 @@ if __name__ == '__main__':
                    executable="cat",
                    )
     v = t.verify()
-    print(v)
-    # t.translate('common.py', 'tmp.txt')

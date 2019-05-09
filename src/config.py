@@ -12,9 +12,6 @@ from src import BenchmarkException, ConfigException, cwd
 from src.test import TestCase, TestSuite, TestInput
 from src.translators import Translator
 
-# todo remove this and make proper logger
-logging.basicConfig(level=logging.DEBUG)
-
 
 @dataclass
 class DictPoper:
@@ -86,7 +83,7 @@ class Config:
     test_inputs: List[TestInput] = field(default_factory=list)
 
     _load_errors_occured: bool = False
-    _logger: logging.Logger = logging.getLogger("Config")
+    _logger: logging.Logger = logging.getLogger("BenchmarkConfig")
 
     def __post_init__(self):
         self._logger.setLevel(logging.DEBUG)
@@ -98,7 +95,6 @@ class Config:
             self._error(f"Config file '{self.config_file}'' is not found/not a file")
             return
 
-        self._logger.info(f"Reading {self.config_file}")
         with open(self.config_file) as source:
             benchmark_config = toml.load(self.config_file)
 
@@ -176,7 +172,7 @@ class Config:
                 translator = Translator(from_format=from_format,
                                         to_format=to_format,
                                         executable=executable,
-                                        options=options,
+                                        options=(option.strip() for option in options),
                                         input_as_last_argument=input_as_last_argument,
                                         input_after_option=input_after_option,
                                         output_after_option=output_after_option,
@@ -292,7 +288,7 @@ class Config:
                                            PATH=PATH,
                                            version=version,
                                            executable=executable,
-                                           options=static_options,
+                                           options=(option.strip() for option in static_options),
                                            test_inputs=self.test_inputs)
                     self._load_test_cases(test_suite_config, test_suite)
                     test_suite.verify()

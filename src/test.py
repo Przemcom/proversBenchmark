@@ -2,15 +2,14 @@
 # https://stackoverflow.com/questions/33837918/type-hints-solve-circular-dependency
 from __future__ import annotations
 
-import logging
 import os
 import subprocess
 import time
 from dataclasses import dataclass, field
 from typing import List, ClassVar, Generator
 
-from src import BenchmarkException, cwd
-from src.common import is_executable
+from src import BenchmarkException, cwd, logger
+from src._common import is_executable
 from src.stats import TestSuiteStatistics, TestCaseStatistics, SATStatistics, SATStatus, OutputStatistics, \
     MonitoredProcess
 from src.translators import Translator
@@ -178,7 +177,7 @@ class TestCase:
 
             # todo ctr+c skips testcase?
             # process may execute too quick to get statistics
-            logging.info(f"Running testcase '{self.name}' with '{input_filepath}': {command}")
+            logger.info(f"Running testcase '{self.name}' with '{input_filepath}': {command}")
             with MonitoredProcess(command,
                                   stdin=stdin,
                                   stdout=stdout,

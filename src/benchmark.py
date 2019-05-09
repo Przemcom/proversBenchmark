@@ -5,7 +5,7 @@ from src.stats import Statistics
 from src.test import TestSuite
 
 
-@dataclass()
+@dataclass
 class Benchmark:
     test_suite: List[TestSuite]
 

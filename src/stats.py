@@ -8,15 +8,7 @@ from typing import List
 
 import psutil as psutil
 
-
-@dataclass
-class ExecutionStatistics:
-    pid: int
-    cpu_time = None
-    execution_time: int = 0
-    peak_memory: int = 0
-    peak_disk_read: int = 0
-    peak_disk_write: int = 0
+from src import logger
 
 
 class MonitoredProcess(subprocess.Popen):
@@ -32,6 +24,7 @@ class MonitoredProcess(subprocess.Popen):
             self.disk_reads = 0
             self.disk_writes = 0
         except psutil.AccessDenied:
+            logger.warning("Can not disk IO info - permission denied")
             # must me sudo to get disk io info
             self._has_permission = False
             self.disk_reads = None
@@ -52,7 +45,7 @@ class MonitoredProcess(subprocess.Popen):
         if super().poll() is not None:
             return super().poll()
 
-        # can not do it in __exit__, because process no longer not exits there
+        # can not do it in __exit__, because process no longer not exists there
         if self._has_permission:
             io_counters = self.proc.io_counters()
             self.disk_reads = io_counters.read_bytes + io_counters.read_chars

@@ -1,7 +1,6 @@
 import os
 import subprocess
 import typing
-
 from typing import List
 
 from src import BenchmarkException
