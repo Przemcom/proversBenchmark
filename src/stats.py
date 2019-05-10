@@ -64,7 +64,7 @@ class MonitoredProcess(subprocess.Popen):
             self.exec_stats.disable_io()
 
         super().__init__(*args, **kwargs)
-        self._start = time.time()
+        self._start = time.perf_counter()
         self.proc = psutil.Process(self.pid)
         self.poll()
 
@@ -84,7 +84,7 @@ class MonitoredProcess(subprocess.Popen):
         return self.exec_stats
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        self.exec_stats.execution_time = time.time() - self._start
+        self.exec_stats.execution_time = time.perf_counter() - self._start
 
 
 class SATType(Enum):
