@@ -1,14 +1,14 @@
 import os
 import subprocess
-from typing import List, Union
+from typing import List, Union, IO, Any
 
 from src.stats import MonitoredProcess
 
 
 def execute(command: List[str],
-            stdin: Union[str, int] = subprocess.DEVNULL,
-            stdout: Union[str, int] = subprocess.DEVNULL,
-            stderr: Union[str, int] = subprocess.DEVNULL,
+            stdin: Union[str, int, IO[Any]] = subprocess.DEVNULL,
+            stdout: Union[str, int, IO[Any]] = subprocess.DEVNULL,
+            stderr: Union[str, int, IO[Any]] = subprocess.DEVNULL,
             PATH: str = None,
             monitored: bool = False,
             *args, **kwargs) -> Union[subprocess.Popen, MonitoredProcess]:
