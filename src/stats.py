@@ -12,18 +12,22 @@ import psutil
 from src import logger
 
 
-class SerializableEncoder(json.JSONEncoder):
+class SerializableJSONEncoder(json.JSONEncoder):
+    """This encoder can encode Enum and classes that inherit Serializable
+    Usage json.dumps(variable, cls=SerializableJSONEncoder)
+    """
 
     def default(self, o):
         if isinstance(o, Serializable):
-            return o.as_dict()
+            return o.as_plain_dict()
         if isinstance(o, Enum):
             return o.value
         return super().default(o)
 
 
 class Serializable:
-    def as_dict(self):
+    def as_plain_dict(self):
+        """Convert to sict that holds only basic types"""
         return self.__dict__
 
 
@@ -54,6 +58,12 @@ class ExecutionStatistics(Serializable):
 
 
 class MonitoredProcess(subprocess.Popen):
+    """Start process that can be monitored by periodic calling poll() in active loop
+    Note that:
+    poll() must be called at least once to get proper statistics
+    short running process can exit before poll method was executed
+    use with context manager to auto stop execution time
+    """
 
     def __init__(self, *args, **kwargs):
         self.exec_stats = ExecutionStatistics()
@@ -78,9 +88,11 @@ class MonitoredProcess(subprocess.Popen):
         return None
 
     def stop(self):
+        """If not used with contex manager, stop counting execution time"""
         self.__exit__(None, None, None)
 
     def get_statistics(self) -> ExecutionStatistics:
+        """Return gathered statistics"""
         return self.exec_stats
 
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -163,7 +175,7 @@ class TestSuiteStatistics(Serializable):
 
 @dataclass
 class Statistics(Serializable):
-    def as_dict(self):
+    def as_plain_dict(self):
         dict_copy = self.__dict__.copy()
         dict_copy["date"] = str(self.date)
         return dict_copy
@@ -186,4 +198,4 @@ if __name__ == '__main__':
                                          command=["ps", "-aux"],
                                          execution_statistics=stats,
                                          input=SATStatistics())
-    print(json.dumps(test_case_stats, default=JsonDefault))
+    print(json.dumps(test_case_stats, default=SerializableJSONEncoder))

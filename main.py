@@ -3,7 +3,7 @@ import json
 
 from src.benchmark import Benchmark
 from src.config import Config
-from src.stats import SerializableEncoder
+from src.stats import SerializableJSONEncoder
 
 
 def parse_args():
@@ -26,4 +26,4 @@ if __name__ == '__main__':
     benchmark = Benchmark(test_suite=config.test_suites)
     print("Result: ")
     stats = benchmark.run()
-    print(json.dumps(stats, indent=2, cls=SerializableEncoder))
+    print(json.dumps(stats, indent=2, cls=SerializableJSONEncoder))

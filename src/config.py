@@ -15,7 +15,14 @@ from src.translators import Translator
 
 @dataclass
 class DictPoper:
+    """Convenience class for removing items from dictionary
+    use with context manager to print warning if dictionary was not emptied
+    """
     def __init__(self, source: dict, logger: logging.Logger = logging, *args, **kwargs):
+        """source is dictionry that will be consumed
+        log any errors to logger
+        args and kwargs are used for logging as context to provide more info where the error occured
+         """
         self.source = source
         self._logger = logger
         self._log_context = []
@@ -38,7 +45,7 @@ class DictPoper:
         """Remove and return variable from source and:
         add default value if not in source
         log error if required and not in source
-        check type of variable
+        set self.errors_occured if something went wrong
         """
         ok = True
         value = self.source.pop(variable, default)
@@ -60,7 +67,8 @@ class DictPoper:
         return value, ok
 
     @property
-    def log_context(self):
+    def log_context(self) -> str:
+        """Return context passed to class in __init__ method"""
         return ' '.join(map(str, self._log_context))
 
     def _error(self, message):

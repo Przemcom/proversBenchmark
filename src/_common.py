@@ -12,6 +12,12 @@ def execute(command: List[str],
             PATH: str = None,
             monitored: bool = False,
             *args, **kwargs) -> Union[subprocess.Popen, MonitoredProcess]:
+    """Execute command is subprocess
+    is stdin, stdout, stderr is str, then opens file
+    PATH is appended to enviroment variable and passed to Popen as env
+    args and kwargs are passed to Popen
+    :return running process: MonitoredProcess if monitored == True else Popen
+    """
     if isinstance(stdin, str):
         stdin = open(stdin, 'r')
     if isinstance(stdout, str):

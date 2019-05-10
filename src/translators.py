@@ -11,8 +11,6 @@ from src._common import execute
 class Translator:
     """Translate text to different syntax by calling executable
     by default input file is piped to stdin, stdout is piped to output file
-    command is composed as follows:
-    executable [options] [input_after_option input_filename] [output_output_after_option out_filename]
     if input_as_last_argument is True, input_filename will be last arguments
     input_as_last_argument and input_after_option are mutually exclusive
     """
@@ -50,6 +48,10 @@ class Translator:
                        PATH=self.PATH)
 
     def get_command(self, input_filename: str, output_filename: str) -> List[str]:
+        """Command is composed as follows:
+        executable [options] [input_after_option input_filename] [output_output_after_option out_filename]
+        :return: list representing executable and options
+        """
         command = [self.executable]
         command.extend(self.options)
         if self.input_after_option:

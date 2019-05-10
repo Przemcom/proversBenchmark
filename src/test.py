@@ -24,19 +24,30 @@ class TestInput:
 
     translators: ClassVar[List[Translator]] = []
 
+    _cache_path: str = "inputs"
+
     def __post_init__(self):
         if self.path is not None and not os.path.isabs(self.path):
             self.path = os.path.abspath(os.path.join(self.cwd, self.path))
+        # todo warn if path does not exits
 
         for file in self.files:
             if not os.path.isfile(os.path.join(self.path, file)):
                 raise BenchmarkException(f"file {file} does not exists (is not a file)", self)
 
+    # todo add caching
     def get_file_statistics(self, file_path: str) -> SATStatistics:
         stats = SATStatistics(name=self.name, path=file_path, format=self.format)
+        # todo implement
         return stats
 
+    # todo add caching
     def as_format(self, desired_format: str) -> Generator[str, SATStatistics]:
+        """Convert self.files to different format
+        Cache files will be written to cwd/self._cache_path/self.name/desired_format
+        new extension is specified by translator
+        :return path to files in specified format and statistics about this file
+        """
         if desired_format == self.format:
             for file in self.files:
                 file_path = os.path.abspath(os.path.join(self.path, file))
@@ -44,7 +55,7 @@ class TestInput:
                 yield file_path, stats
                 return
 
-        # todo support translator chining
+        # todo support translator chaining
         for translator in TestInput.translators:
             if translator.from_format == self.format and translator.to_format == desired_format:
                 break
@@ -59,7 +70,10 @@ class TestInput:
             yield out_file_path, self.get_file_statistics(file_path=out_file_path)
 
     def _get_out_filepath(self, prefix: str, file: str, extension: str):
-        out_dir = os.path.join(self.cwd, "inputs", self.name, prefix)
+        """Get new filepath when converting syntax
+        :return cwd/self._cache_path/self.name/prefix/dirname(file)/file.extension
+        """
+        out_dir = os.path.join(self.cwd, self._cache_path, self.name, prefix)
         directory_from_file, filename = os.path.split(file)
         directory_from_file = os.path.join(out_dir, directory_from_file)
         if not os.path.exists(directory_from_file):
@@ -83,9 +97,11 @@ class TestSuite:
         if self.PATH is not None and not os.path.isabs(self.PATH):
             self.PATH = os.path.abspath(os.path.join(cwd, self.PATH))
 
+        # todo warn if PATH does not exits
         # todo check if all formats are achievable (static method?) also unify this with Config
 
     def run(self) -> TestSuiteStatistics:
+        """Synchronously run all test cases defined in this test suite"""
         test_suite_stats = TestSuiteStatistics(program_name=self.executable,
                                                program_version=self.version)
         for test_case in self.test_cases:
@@ -118,7 +134,7 @@ class TestCase:
             raise BenchmarkException(f"exclude and include_only are mutually exclusive", self)
 
     def build_command(self, executable: str, input_filepath: str, suite_options: List[str] = None) -> List[str]:
-        # todo respect self.format (automatically convert)
+        """Get command for this test case"""
         command = [executable]
 
         if suite_options:
@@ -137,19 +153,19 @@ class TestCase:
         return command
 
     def filter_inputs(self, test_inputs: List[TestInput]) -> List[TestInput]:
+        """Get inputs that are valid for this test case"""
         result = []
         if not self.include_only and not self.exclude:
             return test_inputs
         elif self.include_only:
-            result.extend(
-                test_input for test_input in test_inputs if test_input.name in self.include_only)
+            result.extend(test_input for test_input in test_inputs if test_input.name in self.include_only)
         elif self.exclude:
-            result.extend(
-                test_input for test_input in test_inputs if test_input.name not in self.include_only)
+            result.extend(test_input for test_input in test_inputs if test_input.name not in self.include_only)
         return result
 
     def run(self, executable: str, options: List[str], PATH: str, test_input: TestInput) -> Generator[
         TestCaseStatistics]:
+        """Synchronously runs executable with options and self.options against all files in test_input"""
         for input_filepath, input_statistics in test_input.as_format(self.format):
             command = self.build_command(executable=executable,
                                          input_filepath=input_filepath,
@@ -165,7 +181,7 @@ class TestCase:
                          monitored=True,
                          text=True) as proc:
                 while proc.poll() is None:
-                    time.sleep(0.05)
+                    time.sleep(0.001)
             test_case_stats = TestCaseStatistics(name=self.name,
                                                  command=command,
                                                  input=input_statistics,
