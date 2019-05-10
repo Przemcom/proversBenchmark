@@ -12,9 +12,14 @@ import psutil
 from src import logger
 
 
-def JsonDefault(obj):
-    if isinstance(obj, Serializable):
-        return obj.as_dict()
+class SerializableEncoder(json.JSONEncoder):
+
+    def default(self, o):
+        if isinstance(o, Serializable):
+            return o.as_dict()
+        if isinstance(o, Enum):
+            return o.value
+        return super().default(o)
 
 
 class Serializable:
