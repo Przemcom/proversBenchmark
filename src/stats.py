@@ -9,8 +9,6 @@ from typing import List
 
 import psutil
 
-from src import logger
-
 
 class SerializableJSONEncoder(json.JSONEncoder):
     """This encoder can encode Enum and classes that inherit Serializable
@@ -39,16 +37,14 @@ class ExecutionStatistics(Serializable):
     peak_memory: int = None
     disk_reads: int = None
     disk_writes: int = None
-    _update_io = True
-
-    def disable_io(self):
-        self._update_io = False
 
     def update(self, proc: psutil.Process):
-        if self._update_io:
+        try:
             io_counters = proc.io_counters()
             self.disk_reads = io_counters.read_bytes + io_counters.read_chars
             self.disk_writes = io_counters.write_bytes + io_counters.read_chars
+        except psutil.AccessDenied:
+            pass
 
         mem_info = proc.memory_info()
         if self.peak_memory is None or self.peak_memory < mem_info.rss:
@@ -67,12 +63,6 @@ class MonitoredProcess(subprocess.Popen):
 
     def __init__(self, *args, **kwargs):
         self.exec_stats = ExecutionStatistics()
-        try:
-            psutil.Process().io_counters()
-        except psutil.AccessDenied:
-            logger.warning("Can not disk IO info - permission denied")
-            self.exec_stats.disable_io()
-
         super().__init__(*args, **kwargs)
         self._start = time.perf_counter()
         self.proc = psutil.Process(self.pid)

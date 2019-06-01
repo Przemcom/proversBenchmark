@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 import subprocess
 import time
 from dataclasses import dataclass, field, InitVar
@@ -10,7 +11,7 @@ from typing import List, ClassVar, Generator
 
 from src import BenchmarkException, logger
 from src._common import execute
-from src.stats import TestSuiteStatistics, TestCaseStatistics, SATStatistics, SATStatus, OutputStatistics
+from src.stats import TestSuiteStatistics, TestCaseStatistics, SATStatistics, SATStatus, OutputStatistics, SATType
 from src.translators import Translator
 
 
@@ -37,8 +38,55 @@ class TestInput:
 
     # todo add caching
     def get_file_statistics(self, file_path: str) -> SATStatistics:
+        # workaround: look for tptp header
         stats = SATStatistics(name=self.name, path=file_path, format=self.format)
-        # todo implement
+
+        if self.format != 'TPTP':
+            logger.warning(f'no statistics available for format {self.format}. Only TPTP stats are supported')
+            return stats
+
+        with open(file_path) as source:
+            file_contens = source.read()
+
+            if "cnf(" in file_contens:
+                stats.SAT_type = SATType.CNF
+            elif "fof(" in file_contens:
+                stats.SAT_type = SATType.FOF
+            elif "tff(" in file_contens:
+                stats.SAT_type = SATType.TFF
+            elif "thf(" in file_contens:
+                stats.SAT_type = SATType.THF
+            else:
+                stats.SAT_type = None
+
+            pattern = r'%.*Number of clauses\s*:\s*([0-9]+).*'
+            result = re.search(pattern, file_contens)
+            stats.number_of_clauses = result.group(1) if result is not None else None
+
+            pattern = r'%.*Number of atoms\s*:\s*(\d+).*'
+            result = re.search(pattern, file_contens)
+            stats.number_of_atoms = result.group(1) if result is not None else None
+
+            pattern = r'%.*Maximal clause size\s*:\s*(\d+).*'
+            result = re.search(pattern, file_contens)
+            stats.maximal_clause_size = result.group(1) if result is not None else None
+
+            pattern = r'%.*Number of predicates\s*:\s*(\d+).*'
+            result = re.search(pattern, file_contens)
+            stats.number_of_predicates = result.group(1) if result is not None else None
+
+            pattern = r'%.*Number of functors\s*:\s*(\d+).*'
+            result = re.search(pattern, file_contens)
+            stats.number_of_functors = result.group(1) if result is not None else None
+
+            pattern = r'%.*Number of variables\s*:\s*(\d+).*'
+            result = re.search(pattern, file_contens)
+            stats.number_of_variables = result.group(1) if result is not None else None
+
+            pattern = r'%.*Maximal term depth\s*:\s*(\d+).*'
+            result = re.search(pattern, file_contens)
+            stats.maximal_term_depth = result.group(1) if result is not None else None
+
         return stats
 
     # todo add caching
@@ -67,7 +115,7 @@ class TestInput:
             in_file_path = os.path.abspath(os.path.join(self.path, file))
             out_file_path = self._get_out_filepath(desired_format, file, extension)
             translator.translate(in_file_path, out_file_path).wait()
-            yield out_file_path, self.get_file_statistics(file_path=out_file_path)
+            yield out_file_path, self.get_file_statistics(file_path=in_file_path)
 
     def _get_out_filepath(self, prefix: str, file: str, extension: str):
         """Get new filepath when converting syntax
@@ -192,7 +240,7 @@ class TestCase:
 
             if proc.returncode != 0:
                 out_stats.status = SATStatus.ERROR
-            else:
+            elif executable == 'prover9':
                 # todo implement parser (if these ifs are not enough)
                 # partial prover9 parser
                 if 'THEOREM PROVED' in out_stats.output:
@@ -200,6 +248,9 @@ class TestCase:
                 elif 'SEARCH FAILED' in out_stats.output:
                     # todo this case means UNSATISFIABLE or UNKNOWN?
                     out_stats.status = SATStatus.UNSATISFIABLE
+            elif executable == 'SPASS':
+                if 'nSPASS beiseite: Proof found' in out_stats.output:
+                    out_stats.status = SATStatus.SATISFIABLE
 
             test_case_stats.output = out_stats
 
