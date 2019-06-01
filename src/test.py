@@ -192,11 +192,11 @@ class TestCase:
             command.extend(option for option in self.options if option)
 
         if self.input_after_option:
-            command.extend(self.input_after_option)
-            command.extend(input_filepath)
+            command.append(self.input_after_option)
+            command.append(input_filepath)
 
         if self.input_as_last_argument:
-            command.extend(input_filepath)
+            command.append(input_filepath)
 
         return command
 
