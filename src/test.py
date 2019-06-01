@@ -115,7 +115,9 @@ class TestInput:
             in_file_path = os.path.abspath(os.path.join(self.path, file))
             out_file_path = self._get_out_filepath(desired_format, file, extension)
             translator.translate(in_file_path, out_file_path).wait()
-            yield out_file_path, self.get_file_statistics(file_path=in_file_path)
+            stats = self.get_file_statistics(file_path=in_file_path)
+            stats.translated_with.append(translator)
+            yield out_file_path, stats
 
     def _get_out_filepath(self, prefix: str, file: str, extension: str):
         """Get new filepath when converting syntax
