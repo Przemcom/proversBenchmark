@@ -26,6 +26,7 @@ class SerializableJSONEncoder(json.JSONEncoder):
 class Serializable:
     def as_plain_dict(self):
         """Convert to sict that holds only basic types"""
+        # todo ignore variables that start with _
         return self.__dict__
 
 
