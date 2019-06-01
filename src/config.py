@@ -356,11 +356,6 @@ class Config:
                                            required=True,
                                            type_check=str)
 
-                # note: TestInput is assumed to be tptp
-                # todo support chaining translators
-                if ok and not any(translator.to_format == format for translator in TestInput.translators):
-                    self._error(f"format {format} is not achievable with defined translators: {TestInput.translators}")
-
                 # nested list
                 options, _ = poper.pop_key(variable="options",
                                            required=True,

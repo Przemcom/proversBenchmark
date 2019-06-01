@@ -24,29 +24,30 @@ files=["*.p"]
 # currently only TPTP
 format="TPTP"
 
-[[testInputs]]
-# for specifying include/exclude in testCase
-name="prover9_files"
-# path to files
-path="tests/data/prover9"
-# wildcards supported
-files=["*.in"]
-# currently only TPTP
-format="LADR"
+#[[testInputs]]
+## for specifying include/exclude in testCase
+#name="prover9_files"
+## path to files
+#path="tests/data/prover9"
+## wildcards supported
+#files=["*.in"]
+## currently only TPTP
+#format="LADR"
 
+# PROVER9
 [[testSuites]]
 name="prover9 tests"
 # name available in PATH
 executable="prover9"
 # append to path env variable, comment or leave empty to disable
 PATH="../provers/LADR-2009-11A/bin"
-#version=""
+version="2009-11A"
 # options always appended to executable, comment or leave empty to disable
 #options=[""]
 
 [[testSuites.testCases]]
 # metadata
-name="Prover9 with translator"
+name="Prover9 with selected test files"
 # what file format is accepted by prover, input will be automatically translated if possible
 format="LADR"
 # mutually exclusive options input_as_last_argument, input_after_option
@@ -54,15 +55,24 @@ format="LADR"
 #input_after_option="-o"
 
 # mutually exclusive: include or exclude inputs for test. Comment both to test all
-include_only=["prover9_files"]
+#include_only=["prover9_files"]
 #exclude=[""]
 
 # list of options to test,
 # set to [] or add empty string as option to run testcase without options
 options=[]
 
+# SPASS
+[[testSuites]]
+name="spass tests"
+executable="SPASS"
+PATH="../provers/spass39/"
+version="3.9"
+
 [[testSuites.testCases]]
-name="Prover9 with -x"
-format="LADR"
-options=["-x"]
-exclude=["prover9_files"]
+name="SPASS with selected test files"
+format="TPTP"
+options=[]
+input_after_option="-TPTP"
+
+
