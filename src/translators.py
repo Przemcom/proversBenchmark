@@ -5,10 +5,11 @@ from typing import List
 
 from src import BenchmarkException, logger
 from src._common import execute
+from src.stats import Serializable
 
 
 @dataclass
-class Translator:
+class Translator(Serializable):
     """Translate text to different syntax by calling executable
     by default input file is piped to stdin, stdout is piped to output file
     if input_as_last_argument is True, input_filename will be last arguments

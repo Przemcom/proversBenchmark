@@ -11,12 +11,13 @@ from typing import List, ClassVar, Generator
 
 from src import BenchmarkException, logger
 from src._common import execute
-from src.stats import TestSuiteStatistics, TestCaseStatistics, SATStatistics, SATStatus, OutputStatistics, SATType
+from src.stats import TestSuiteStatistics, TestCaseStatistics, SATStatistics, SATStatus, OutputStatistics, SATType, \
+    Serializable
 from src.translators import Translator
 
 
 @dataclass
-class TestInput:
+class TestInput(Serializable):
     name: str
     format: str
     cwd: str = os.getcwd()

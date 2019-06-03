@@ -186,7 +186,7 @@ class Config:
                                         to_format=to_format,
                                         executable=executable,
                                         extension=extension,
-                                        options=(option.strip() for option in options),
+                                        options=[option.strip() for option in options],
                                         input_as_last_argument=input_as_last_argument,
                                         input_after_option=input_after_option,
                                         output_after_option=output_after_option,
