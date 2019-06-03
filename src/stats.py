@@ -27,7 +27,11 @@ class Serializable:
     def as_plain_dict(self):
         """Convert to sict that holds only basic types"""
         # todo ignore variables that start with _
-        return self.__dict__
+        class_dict = self.__dict__.copy()
+        for key, value in self.__dict__.items():
+            if key.startswith('_') or key.startswith(self.__class__.__name__):
+                class_dict.pop(key)
+        return class_dict
 
 
 @dataclass
