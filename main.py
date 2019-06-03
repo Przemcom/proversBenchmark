@@ -1,6 +1,7 @@
 import argparse
 import json
 
+from src import logger
 from src.benchmark import Benchmark
 from src.config import Config
 from src.stats import SerializableJSONEncoder
@@ -24,6 +25,7 @@ if __name__ == '__main__':
     config.load_config()
 
     benchmark = Benchmark(test_suite=config.test_suites)
-    print("Result: ")
     stats = benchmark.run()
-    print(json.dumps(stats, indent=2, cls=SerializableJSONEncoder))
+    with open(config.output_dir, 'w') as outfile:
+        logger.info(f'writing results to {config.output_dir}')
+        json.dump(stats, outfile, indent=2, cls=SerializableJSONEncoder)
