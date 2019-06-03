@@ -113,10 +113,21 @@ class TestInput(Serializable):
         else:
             raise BenchmarkException(f"No translator from {self.format} to {desired_format} found")
 
-        extension = os.path.splitext(self.files[0])[1] if translator.extension is None else translator.extension
         for file in self.files:
             in_file_path = os.path.abspath(os.path.join(self.path, file))
-            out_file_path = self._get_out_filepath(desired_format, file, extension)
+
+            # /cwd/self._cache_path/self.name/desired_format/dir_structure(file)/file.extension
+            out_file_path = os.path.join(self.cwd,
+                                         self._cache_path,
+                                         self.name,
+                                         desired_format,
+                                         os.path.relpath(file, start=self.path))
+            dirname, filename = os.path.split(out_file_path)
+            if not os.path.exists(dirname):
+                os.makedirs(dirname)
+            extension = '' if translator.extension is None else translator.extension
+            out_file_path = os.path.join(dirname, os.path.splitext(filename)[0] + extension)
+
             translator.translate(in_file_path, out_file_path).wait()
             stats = self.get_file_statistics(file_path=in_file_path)
             stats.translated_with.append(translator)
