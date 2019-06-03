@@ -1,7 +1,7 @@
 import os
 import subprocess
 from dataclasses import dataclass, field, InitVar
-from typing import List
+from typing import List, Optional
 
 from src import BenchmarkException, logger
 from src._common import execute
@@ -40,7 +40,9 @@ class Translator(Serializable):
             raise BenchmarkException("Options input_after_option and input_as_last_argument are mutually exclusive",
                                      self)
 
-    def translate(self, input_filename: str, output_filename: str) -> subprocess.Popen:
+    def translate(self, input_filename: str, output_filename: str) -> Optional[subprocess.Popen]:
+        if os.path.isfile(output_filename):
+            return None
         command = self.get_command(input_filename, output_filename)
         logger.info(f"Translating {input_filename} from {self.from_format} to {self.to_format} to {output_filename}")
         return execute(command=command,
