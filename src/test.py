@@ -167,6 +167,9 @@ class TestSuite:
                                       options=self.options,
                                       PATH=self.PATH,
                                       test_input=test_input))
+            except BenchmarkException as e:
+                logger.error(e)
+                continue
             except KeyboardInterrupt:
                 logger.info("Keyboard interrupt")
                 break
