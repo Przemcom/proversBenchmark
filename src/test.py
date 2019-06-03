@@ -102,6 +102,7 @@ class TestInput(Serializable):
         if desired_format == self.format:
             for file in self.files:
                 yield file, self.get_file_statistics(file_path=file)
+            return
 
         # todo support translator chaining
         for translator in TestInput.translators:
