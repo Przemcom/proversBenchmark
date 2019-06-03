@@ -137,6 +137,11 @@ class Config:
                                                default=self.output_dir,
                                                required=False,
                                                type_check=str)
+
+            TEST_CASE_TIMEOUT, _ = poper.pop_key(variable="test_case_timeout",
+                                                 default=300,
+                                                 required=False,
+                                                 type_check=int)
             # todo check is is writeable (should be dir or file?
 
     def _load_translators(self, translators_config: List) -> NoReturn:

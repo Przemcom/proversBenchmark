@@ -15,6 +15,8 @@ from src.stats import TestSuiteStatistics, TestCaseStatistics, SATStatistics, SA
     Serializable
 from src.translators import Translator
 
+TEST_CASE_TIMEOUT = 300  # seconds
+
 
 @dataclass
 class TestInput(Serializable):
@@ -120,17 +122,6 @@ class TestInput(Serializable):
             stats.translated_with.append(translator)
             yield out_file_path, stats
 
-    def _get_out_filepath(self, prefix: str, file: str, extension: str):
-        """Get new filepath when converting syntax
-        :return cwd/self._cache_path/self.name/prefix/dirname(file)/file.extension
-        """
-        out_dir = os.path.join(self.cwd, self._cache_path, self.name, prefix)
-        directory_from_file, filename = os.path.split(file)
-        directory_from_file = os.path.join(out_dir, directory_from_file)
-        if not os.path.exists(directory_from_file):
-            os.makedirs(directory_from_file)
-        return os.path.join(directory_from_file, os.path.splitext(file)[0] + extension)
-
 
 @dataclass
 class TestSuite:
@@ -224,6 +215,8 @@ class TestCase:
             # todo ctr+c skips testcase?
             # process may execute too quick to get statistics
             logger.info(f"Running testcase '{self.name}' with '{input_filepath}': {command}")
+            start = time.perf_counter()
+            killed: bool = False
             with execute(command,
                          stdin=input_filepath,
                          stdout=subprocess.PIPE,
@@ -233,6 +226,10 @@ class TestCase:
                          text=True) as proc:
                 while proc.poll() is None:
                     time.sleep(0.001)
+                    if time.perf_counter() - start > TEST_CASE_TIMEOUT:
+                        proc.kill()
+                        killed: bool = True
+                        break
             test_case_stats = TestCaseStatistics(name=self.name,
                                                  command=command,
                                                  input=input_statistics,

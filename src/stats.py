@@ -137,7 +137,8 @@ class SATStatus(Enum):
     ERROR = "error"
     SATISFIABLE = "satisfiable"
     UNSATISFIABLE = "unsatisfiable"
-    UNKOWN = "UNKNOWN"
+    UNKOWN = "unknown"
+    TIMEOUT = "timeout"
 
 
 @dataclass
