@@ -249,18 +249,35 @@ class TestCase:
             out_stats = OutputStatistics(returncode=proc.returncode)
             out_stats.output, out_stats.error = proc.communicate()
 
-            if proc.returncode != 0:
-                out_stats.status = SATStatus.ERROR
+            if killed:
+                out_stats.status = SATStatus.TIMEOUT
+            # Prover9: Exit Code	Reason for Termination (from https://www.cs.unm.edu/~mccune/prover9/manual/2009-11A/)
+            # 0 (MAX_PROOFS) 	The specified number of proofs (max_proofs) was found.
+            # 1 (FATAL) 	A fatal error occurred (user's syntax error or Prover9's bug).
+            # 2 (SOS_EMPTY) 	Prover9 ran out of things to do (sos list exhausted).
+            # 3 (MAX_MEGS) 	The max_megs (memory limit) parameter was exceeded.
+            # 4 (MAX_SECONDS) 	The max_seconds parameter was exceeded.
+            # 5 (MAX_GIVEN) 	The max_given parameter was exceeded.
+            # 6 (MAX_KEPT) 	The max_kept parameter was exceeded.
+            # 7 (ACTION) 	A Prover9 action terminated the search.
+            # 101 (SIGINT) 	Prover9 received an interrupt signal.
+            # 102 (SIGSEGV) 	Prover9 crashed, most probably due to a bug.
             elif executable == 'prover9':
                 # todo implement parser (if these ifs are not enough)
                 # partial prover9 parser
-                if 'THEOREM PROVED' in out_stats.output:
+                # prover9 exits with 2 if search failed
+                if proc.returncode == 0:
                     out_stats.status = SATStatus.SATISFIABLE
-                elif 'SEARCH FAILED' in out_stats.output:
-                    # todo this case means UNSATISFIABLE or UNKNOWN?
+                elif proc.returncode == 1:
+                    out_stats.status = SATStatus.ERROR
+                elif proc.returncode == 4:
+                    out_stats.status = SATStatus.TIMEOUT
+                else:
                     out_stats.status = SATStatus.UNSATISFIABLE
             elif executable == 'SPASS':
                 if 'nSPASS beiseite: Proof found' in out_stats.output:
+                    out_stats.status = SATStatus.SATISFIABLE
+                elif 'SPASS beiseite: Completion found' in out_stats.output:
                     out_stats.status = SATStatus.SATISFIABLE
 
             test_case_stats.output = out_stats
