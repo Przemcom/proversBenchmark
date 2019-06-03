@@ -237,18 +237,10 @@ class Config:
                     wildcard = os.path.join(prefix, pattern)
                     resolved_paths = glob.glob(wildcard, recursive=True)
 
-                    resolved_files = []
-                    for resolved_path in resolved_paths:
-                        if not os.path.isfile(resolved_path):
-                            self._logger.warning(f"skipping {resolved_path} from {pattern} - is not a file")
-                            continue
-                        # remove prefix, store file as relative to prefix
-                        resolved_files.append(resolved_path[len(prefix) + 1:])
-
-                    if not resolved_files:
+                    if not resolved_paths:
                         self._logger.warning(f"pattern '{wildcard}' did not match any file")
                     else:
-                        files.extend(resolved_files)
+                        files.extend(resolved_paths)
 
                 if not files:
                     self._error(f"no file defined for testInput")
