@@ -128,7 +128,11 @@ class TestInput(Serializable):
             extension = '' if translator.extension is None else translator.extension
             out_file_path = os.path.join(dirname, os.path.splitext(filename)[0] + extension)
 
-            translator.translate(in_file_path, out_file_path).wait()
+            proc = translator.translate(in_file_path, out_file_path)
+            if proc:
+                proc.wait()
+            else:
+                logger.debug(f'{filename} is cached')
             stats = self.get_file_statistics(file_path=in_file_path)
             stats.translated_with.append(translator)
             yield out_file_path, stats
@@ -158,14 +162,18 @@ class TestSuite:
         test_suite_stats = TestSuiteStatistics(program_name=self.executable,
                                                program_version=self.version)
         for test_case in self.test_cases:
-            for test_input in test_case.filter_inputs(self.test_inputs):
-                for test_case_stats in test_case.run(executable=self.executable,
-                                                     options=self.options,
-                                                     PATH=self.PATH,
-                                                     test_input=test_input):
-                    test_suite_stats.test_cases.append(test_case_stats)
+            try:
+                for test_input in test_case.filter_inputs(self.test_inputs):
+                    test_suite_stats.test_cases.extend(
+                        test_case.run(executable=self.executable,
+                                      options=self.options,
+                                      PATH=self.PATH,
+                                      test_input=test_input))
+            except KeyboardInterrupt:
+                logger.info("Keyboard interrupt")
+                break
 
-        return test_suite_stats
+        yield test_suite_stats
 
 
 @dataclass
@@ -247,7 +255,7 @@ class TestCase:
                                                  execution_statistics=proc.get_statistics())
 
             out_stats = OutputStatistics(returncode=proc.returncode)
-            out_stats.output, out_stats.error = proc.communicate()
+            out_stats.stdout, out_stats.stderr = proc.communicate()
 
             if killed:
                 out_stats.status = SATStatus.TIMEOUT
@@ -275,9 +283,9 @@ class TestCase:
                 else:
                     out_stats.status = SATStatus.UNSATISFIABLE
             elif executable == 'SPASS':
-                if 'nSPASS beiseite: Proof found' in out_stats.output:
+                if 'SPASS beiseite: Proof found' in out_stats.stdout:
                     out_stats.status = SATStatus.SATISFIABLE
-                elif 'SPASS beiseite: Completion found' in out_stats.output:
+                elif 'SPASS beiseite: Completion found' in out_stats.stdout:
                     out_stats.status = SATStatus.SATISFIABLE
 
             test_case_stats.output = out_stats

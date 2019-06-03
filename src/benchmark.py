@@ -13,5 +13,5 @@ class Benchmark:
         statistics = Statistics()
         for test_suite in self.test_suite:
             test_suite_stats = test_suite.run()
-            statistics.test_suites.append(test_suite_stats)
+            statistics.test_suites.extend(test_suite_stats)
         return statistics

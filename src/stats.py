@@ -149,8 +149,8 @@ class SATStatus(Enum):
 class OutputStatistics(Serializable):
     returncode: int = None
     status: SATStatus = None
-    error: str = None
-    output: str = None
+    stderr: str = None
+    stdout: str = None
 
 
 @dataclass
