@@ -293,7 +293,7 @@ class Config:
                                            PATH=PATH,
                                            version=version,
                                            executable=executable,
-                                           options=(option.strip() for option in static_options),
+                                           options=[option.strip() for option in static_options],
                                            test_inputs=self.test_inputs)
                     self._load_test_cases(test_suite_config, test_suite)
                 except BenchmarkException as e:
