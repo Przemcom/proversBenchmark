@@ -1,7 +1,7 @@
 [general]
 # generate output to
-output_dir="benchmark-output"
-log_file="benchmark.log"
+output_dir="benchmark-output.json"
+test_case_timeout = 300
 
 [[translators]]
 from_format="TPTP"

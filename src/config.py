@@ -128,10 +128,6 @@ class Config:
 
     def _load_general(self, general_config: Dict) -> NoReturn:
         with DictPoper(general_config, self._logger, "[general]", copy.deepcopy(general_config)) as poper:
-            self.log_file, _ = poper.pop_key(variable="log_file",
-                                             default=self.log_file,
-                                             required=False,
-                                             type_check=str)
 
             self.output_dir, _ = poper.pop_key(variable="output_dir",
                                                default=self.output_dir,
