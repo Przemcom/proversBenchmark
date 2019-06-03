@@ -101,10 +101,7 @@ class TestInput(Serializable):
         """
         if desired_format == self.format:
             for file in self.files:
-                file_path = os.path.abspath(os.path.join(self.path, file))
-                stats = self.get_file_statistics(file_path=file_path)
-                yield file_path, stats
-                return
+                yield file, self.get_file_statistics(file_path=file)
 
         # todo support translator chaining
         for translator in TestInput.translators:
