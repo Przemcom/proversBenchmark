@@ -41,8 +41,6 @@ class Translator(Serializable):
                                      self)
 
     def translate(self, input_filename: str, output_filename: str) -> Optional[subprocess.Popen]:
-        if os.path.isfile(output_filename):
-            return None
         command = self.get_command(input_filename, output_filename)
         logger.info(f"Translating {input_filename} from {self.from_format} to {self.to_format} to {output_filename}")
         return execute(command=command,

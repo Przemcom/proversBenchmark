@@ -129,10 +129,7 @@ class TestInput(Serializable):
             out_file_path = os.path.join(dirname, os.path.splitext(filename)[0] + extension)
 
             proc = translator.translate(in_file_path, out_file_path)
-            if proc:
-                proc.wait()
-            else:
-                logger.debug(f'{filename} is cached')
+            proc.wait()
             stats = self.get_file_statistics(file_path=in_file_path)
             stats.translated_with.append(translator)
             yield out_file_path, stats
