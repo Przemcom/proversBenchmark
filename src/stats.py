@@ -25,7 +25,7 @@ class SerializableJSONEncoder(json.JSONEncoder):
 
 class Serializable:
     def as_plain_dict(self):
-        """Convert to sict that holds only basic types"""
+        """Convert to dict that holds only basic types"""
         # todo ignore variables that start with _
         class_dict = self.__dict__.copy()
         for key, value in self.__dict__.items():
@@ -143,6 +143,7 @@ class SATStatus(Enum):
     UNSATISFIABLE = "unsatisfiable"
     UNKOWN = "unknown"
     TIMEOUT = "timeout"
+    OUT_OF_MEMORY = "out of memory"
 
 
 @dataclass

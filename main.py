@@ -5,6 +5,7 @@ from src import logger
 from src.benchmark import Benchmark
 from src.config import Config
 from src.stats import SerializableJSONEncoder
+from src.test import TestInput
 
 
 def parse_args():
@@ -23,6 +24,12 @@ if __name__ == '__main__':
 
     config = Config(config_file=args.file)
     config.load_config()
+    inputs = len(config.test_inputs)
+    translators = len(TestInput.translators)
+    files = sum(len(test_inputs.files) for test_inputs in config.test_inputs)
+    test_suites = len(config.test_suites)
+    test_cases = sum(len(test_suite.test_cases) for test_suite in config.test_suites)
+    logger.info(f'Starting with {inputs} inputs, {files} files, {test_suites} test suites, {test_cases} test cases')
 
     benchmark = Benchmark(test_suite=config.test_suites)
     stats = benchmark.run()

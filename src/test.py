@@ -9,8 +9,10 @@ import time
 from dataclasses import dataclass, field, InitVar
 from typing import List, ClassVar, Generator
 
+import psutil
+
 from src import BenchmarkException, logger
-from src._common import execute
+from src._common import execute_monitored
 from src.stats import TestSuiteStatistics, TestCaseStatistics, SATStatistics, SATStatus, OutputStatistics, SATType, \
     Serializable
 from src.translators import Translator
@@ -172,7 +174,7 @@ class TestSuite:
                 continue
             except KeyboardInterrupt:
                 logger.info("Keyboard interrupt")
-                break
+                continue
 
         yield test_suite_stats
 
@@ -236,42 +238,48 @@ class TestCase:
             # process may execute too quick to get statistics
             logger.info(f"Running testcase '{self.name}' with '{input_filepath}': {command}")
             start = time.perf_counter()
-            killed: bool = False
-            with execute(command,
-                         stdin=input_filepath,
-                         stdout=subprocess.PIPE,
-                         stderr=subprocess.PIPE,
-                         PATH=PATH,
-                         monitored=True,
-                         text=True) as proc:
+
+            out_stats = OutputStatistics()
+            kill_reason: SATStatus = None
+            with execute_monitored(command,
+                                   stdin=input_filepath,
+                                   stdout=subprocess.PIPE,
+                                   stderr=subprocess.PIPE,
+                                   PATH=PATH,
+                                   text=True) as proc:
                 while proc.poll() is None:
                     time.sleep(0.001)
                     if time.perf_counter() - start > TEST_CASE_TIMEOUT:
                         proc.kill()
-                        killed: bool = True
+                        out_stats.status = SATStatus.TIMEOUT
                         break
+                    if psutil.virtual_memory().free < 100 * 1024 * 1024:  # 100MB
+                        proc.kill()
+                        out_stats.status = SATStatus.OUT_OF_MEMORY
+                        break
+                    output = proc.communicate()
+                    out_stats.stdout, out_stats.stderr = output[0], output[1]
             test_case_stats = TestCaseStatistics(name=self.name,
                                                  command=command,
                                                  input=input_statistics,
                                                  execution_statistics=proc.get_statistics())
 
-            out_stats = OutputStatistics(returncode=proc.returncode)
-            out_stats.stdout, out_stats.stderr = proc.communicate()
-
-            if killed:
-                out_stats.status = SATStatus.TIMEOUT
-            # Prover9: Exit Code	Reason for Termination (from https://www.cs.unm.edu/~mccune/prover9/manual/2009-11A/)
-            # 0 (MAX_PROOFS) 	The specified number of proofs (max_proofs) was found.
-            # 1 (FATAL) 	A fatal error occurred (user's syntax error or Prover9's bug).
-            # 2 (SOS_EMPTY) 	Prover9 ran out of things to do (sos list exhausted).
-            # 3 (MAX_MEGS) 	The max_megs (memory limit) parameter was exceeded.
-            # 4 (MAX_SECONDS) 	The max_seconds parameter was exceeded.
-            # 5 (MAX_GIVEN) 	The max_given parameter was exceeded.
-            # 6 (MAX_KEPT) 	The max_kept parameter was exceeded.
-            # 7 (ACTION) 	A Prover9 action terminated the search.
-            # 101 (SIGINT) 	Prover9 received an interrupt signal.
-            # 102 (SIGSEGV) 	Prover9 crashed, most probably due to a bug.
+            out_stats.returncode = proc.returncode
+            if out_stats.status is not None:
+                pass
             elif executable == 'prover9':
+                # Prover9: Exit Code	Reason for Termination (from https://www.cs.unm.edu/~mccune/prover9/manual/2009-11A/)
+                # 0 (MAX_PROOFS) 	The specified number of proofs (max_proofs) was found.
+                # 1 (FATAL) 	A fatal error occurred (user's syntax error or Prover9's bug).
+                # 2 (SOS_EMPTY) 	Prover9 ran out of things to do (sos list exhausted).
+                # 3 (MAX_MEGS) 	The max_megs (memory limit) parameter was exceeded.
+                # 4 (MAX_SECONDS) 	The max_seconds parameter was exceeded.
+                # 5 (MAX_GIVEN) 	The max_given parameter was exceeded.
+                # 6 (MAX_KEPT) 	The max_kept parameter was exceeded.
+                # 7 (ACTION) 	A Prover9 action terminated the search.
+                # 101 (SIGINT) 	Prover9 received an interrupt signal.
+                # 102 (SIGSEGV) 	Prover9 crashed, most probably due to a bug.
+
                 # todo implement parser (if these ifs are not enough)
                 # partial prover9 parser
                 # prover9 exits with 2 if search failed
