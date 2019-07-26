@@ -30,7 +30,7 @@ class TestInput(Serializable):
 
     translators: ClassVar[List[Translator]] = []
 
-    _cache_path: str = "inputs"
+    cache_path: ClassVar[str] = "inputs"
 
     def __post_init__(self):
         if self.path is not None and not os.path.isabs(self.path):
@@ -118,7 +118,7 @@ class TestInput(Serializable):
 
             # /cwd/self._cache_path/self.name/desired_format/dir_structure(file)/file.extension
             out_file_path = os.path.join(self.cwd,
-                                         self._cache_path,
+                                         TestInput.cache_path,
                                          self.name,
                                          desired_format,
                                          os.path.relpath(file, start=self.path))
@@ -143,7 +143,6 @@ class TestSuite:
     PATH: str = None
     version: str = None
     options: List[str] = field(default_factory=list)
-    cache_dir: str = "test-inputs"
     test_cases: List[TestCase] = field(default_factory=list)
     test_inputs: List[TestInput] = field(default_factory=list)
 
