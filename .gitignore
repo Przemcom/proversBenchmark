@@ -2,3 +2,7 @@
 __pycache__
 *.pyc
 inputs
+.ignore
+.venv
+venv
+benchmark.log
