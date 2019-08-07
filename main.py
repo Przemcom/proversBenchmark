@@ -1,5 +1,6 @@
 import argparse
 import json
+import time
 
 from src import logger
 from src.benchmark import Benchmark
@@ -32,8 +33,10 @@ if __name__ == '__main__':
     logger.info(
         f'Starting with {inputs} inputs, {translators} translators, {files} files, {test_suites} test suites, {test_cases} test cases')
 
+    start = time.time()
     benchmark = Benchmark(test_suite=config.test_suites)
     stats = benchmark.run()
     with open(config.output_dir, 'w') as outfile:
         logger.info(f'writing results to {config.output_dir}')
         json.dump(stats, outfile, indent=2, cls=SerializableJSONEncoder)
+    logger.info(f'Benchmark was running for {start - time.time()} seconds in total')

@@ -295,6 +295,8 @@ class TestCase:
 
             test_case_stats.output = out_stats
 
+            logger.info(
+                f"Testcase '{self.name}' took {test_case_stats.execution_statistics.execution_time}, status: {test_case_stats.output.status}, return code: {test_case_stats.output.returncode}")
             yield test_case_stats
 
 
