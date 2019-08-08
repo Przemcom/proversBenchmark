@@ -39,4 +39,4 @@ if __name__ == '__main__':
     with open(config.output_dir, 'w') as outfile:
         logger.info(f'writing results to {config.output_dir}')
         json.dump(stats, outfile, indent=2, cls=SerializableJSONEncoder)
-    logger.info(f'Benchmark was running for {start - time.time()} seconds in total')
+    logger.info(f'Benchmark was running for {time.time() - start:.2f} seconds in total')

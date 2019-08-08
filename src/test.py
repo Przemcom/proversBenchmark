@@ -7,7 +7,7 @@ import re
 import subprocess
 import time
 from dataclasses import dataclass, field, InitVar
-from typing import List, ClassVar, Generator
+from typing import List, ClassVar, Generator, Tuple
 
 import psutil
 
@@ -18,6 +18,23 @@ from src.stats import TestSuiteStatistics, TestCaseStatistics, SATStatistics, SA
 from src.translators import Translator
 
 TEST_CASE_TIMEOUT = 300  # seconds
+
+
+class CustomPool:
+    max_processes = 8
+
+    def __init__(self):
+        self.processes = []
+
+    def add(self, proc):
+        while len([proc for proc in self.processes if proc.poll() is None]) >= self.max_processes:
+            time.sleep(1)
+        self.processes.append(proc)
+
+    def wait(self):
+        # if any process is running
+        while any([proc for proc in self.processes if proc.poll() is None]):
+            time.sleep(0.1)
 
 
 @dataclass
@@ -95,16 +112,14 @@ class TestInput(Serializable):
         return stats
 
     # todo add caching
-    def as_format(self, desired_format: str) -> Generator[str, SATStatistics]:
+    def as_format(self, desired_format: str) -> Tuple[List[str], List[str], List[Translator]]:
         """Convert self.files to different format
         Cache files will be written to cwd/self._cache_path/self.name/desired_format
         new extension is specified by translator
         :return path to files in specified format and statistics about this file
         """
         if desired_format == self.format:
-            for file in self.files:
-                yield file, self.get_file_statistics(file_path=file)
-            return
+            return self.files, self.files, []
 
         # todo support translator chaining
         for translator in TestInput.translators:
@@ -113,6 +128,9 @@ class TestInput(Serializable):
         else:
             raise BenchmarkException(f"No translator from {self.format} to {desired_format} found")
 
+        pool = CustomPool()
+        out_file_paths = []
+        translators = []
         for file in self.files:
             in_file_path = os.path.abspath(os.path.join(self.path, file))
 
@@ -129,10 +147,11 @@ class TestInput(Serializable):
             out_file_path = os.path.join(dirname, os.path.splitext(filename)[0] + extension)
 
             proc = translator.translate(in_file_path, out_file_path)
-            proc.wait()
-            stats = self.get_file_statistics(file_path=in_file_path)
-            stats.translated_with.append(translator)
-            yield out_file_path, stats
+            pool.add(proc)
+            out_file_paths.append(out_file_path)
+            translators.append(translator)
+        pool.wait()
+        return self.files, out_file_paths, translators
 
 
 @dataclass
@@ -226,25 +245,25 @@ class TestCase:
     def run(self, executable: str, options: List[str], PATH: str, test_input: TestInput) -> Generator[
         TestCaseStatistics]:
         """Synchronously runs executable with options and self.options against all files in test_input"""
-        for input_filepath, input_statistics in test_input.as_format(self.format):
+        original_paths, translated_file_paths, translators = test_input.as_format(self.format)
+        for test_input_path, translator in zip(translated_file_paths, translators):
+            input_statistics = test_input.get_file_statistics(file_path=test_input_path)
+            input_statistics.translated_with = translator
             command = self.build_command(executable=executable,
-                                         input_filepath=input_filepath,
+                                         input_filepath=test_input_path,
                                          suite_options=options)
-            # todo ctr+c skips testcase?
-            # process may execute too quick to get statistics
-            logger.info(f"Running testcase '{self.name}' with '{input_filepath}': {command}")
+            logger.info(f"Running testcase '{self.name}' with '{test_input_path}': {command}")
             start = time.perf_counter()
 
             out_stats = OutputStatistics()
-            kill_reason: SATStatus = None
             with execute_monitored(command,
-                                   stdin=input_filepath,
-                                   stdout=subprocess.PIPE,
+                                   stdin=test_input_path,
+                                   stdout=os.devnull,
                                    stderr=subprocess.PIPE,
                                    PATH=PATH,
                                    text=True) as proc:
                 while proc.poll() is None:
-                    time.sleep(0.001)
+                    time.sleep(0.01)
                     if time.perf_counter() - start > TEST_CASE_TIMEOUT:
                         proc.kill()
                         out_stats.status = SATStatus.TIMEOUT
@@ -253,8 +272,10 @@ class TestCase:
                         proc.kill()
                         out_stats.status = SATStatus.OUT_OF_MEMORY
                         break
-                    output = proc.communicate()
-                    out_stats.stdout, out_stats.stderr = output[0], output[1]
+                    # out_stats.stdout += proc.stdout.read()
+                    # out_stats.stderr += proc.stderr.read()
+                    # print('comminincated', end=' ')
+                out_stats.stdout, out_stats.stderr = proc.communicate()
             test_case_stats = TestCaseStatistics(name=self.name,
                                                  command=command,
                                                  input=input_statistics,
@@ -295,8 +316,10 @@ class TestCase:
 
             test_case_stats.output = out_stats
 
-            logger.info(
-                f"Testcase '{self.name}' took {test_case_stats.execution_statistics.execution_time}, status: {test_case_stats.output.status}, return code: {test_case_stats.output.returncode}")
+            logger.info(f"Testcase '{self.name}' took "
+                        f"{test_case_stats.execution_statistics.execution_time:.2f}, "
+                        f"status: {test_case_stats.output.status}, "
+                        f"return code: {test_case_stats.output.returncode}")
             yield test_case_stats
 
 
