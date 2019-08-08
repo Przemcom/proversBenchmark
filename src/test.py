@@ -246,8 +246,8 @@ class TestCase:
         TestCaseStatistics]:
         """Synchronously runs executable with options and self.options against all files in test_input"""
         original_paths, translated_file_paths, translators = test_input.as_format(self.format)
-        for test_input_path, translator in zip(translated_file_paths, translators):
-            input_statistics = test_input.get_file_statistics(file_path=test_input_path)
+        for original_paths, test_input_path, translator in zip(original_paths, translated_file_paths, translators):
+            input_statistics = test_input.get_file_statistics(file_path=original_paths)
             input_statistics.translated_with = translator
             command = self.build_command(executable=executable,
                                          input_filepath=test_input_path,
