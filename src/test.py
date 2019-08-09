@@ -7,12 +7,13 @@ import re
 import subprocess
 import time
 from dataclasses import dataclass, field, InitVar
-from typing import List, ClassVar, Generator, Tuple
+from typing import List, ClassVar, Generator, Tuple, Optional
 
 import psutil
 
 from src import BenchmarkException, logger
 from src._common import execute_monitored
+from src.non_blocking_stream_reader import NonBlockingStreamReader
 from src.stats import TestSuiteStatistics, TestCaseStatistics, SATStatistics, SATStatus, OutputStatistics, SATType, \
     Serializable
 from src.translators import Translator
@@ -112,14 +113,15 @@ class TestInput(Serializable):
         return stats
 
     # todo add caching
-    def as_format(self, desired_format: str) -> Tuple[List[str], List[str], List[Translator]]:
+    def as_format(self, desired_format: str) -> Tuple[List[str], List[str], List[Optional[Translator]]]:
         """Convert self.files to different format
         Cache files will be written to cwd/self._cache_path/self.name/desired_format
         new extension is specified by translator
         :return path to files in specified format and statistics about this file
         """
         if desired_format == self.format:
-            return self.files, self.files, []
+            # keep the followwing lists the same size
+            return self.files, self.files, [None for _ in self.files]
 
         # todo support translator chaining
         for translator in TestInput.translators:
@@ -179,11 +181,11 @@ class TestSuite:
         for test_case in self.test_cases:
             try:
                 for test_input in test_case.filter_inputs(self.test_inputs):
-                    test_suite_stats.test_cases.extend(
-                        test_case.run(executable=self.executable,
-                                      options=self.options,
-                                      PATH=self.PATH,
-                                      test_input=test_input))
+                    test_case_stats = test_case.run(executable=self.executable,
+                                                    options=self.options,
+                                                    PATH=self.PATH,
+                                                    test_input=test_input)
+                    test_suite_stats.test_cases.extend(test_case_stats)
             except BenchmarkException as e:
                 logger.error(e)
                 continue
@@ -252,16 +254,21 @@ class TestCase:
             command = self.build_command(executable=executable,
                                          input_filepath=test_input_path,
                                          suite_options=options)
-            logger.info(f"Running testcase '{self.name}' with '{test_input_path}': {command}")
+            logger.info(f"Running testcase '{self.name}' with '{os.path.realpath(test_input_path)}': {command}")
             start = time.perf_counter()
 
             out_stats = OutputStatistics()
+            # hack: do not collect prover9 output (too verbose)
             with execute_monitored(command,
                                    stdin=test_input_path,
-                                   stdout=os.devnull,
+                                   stdout=subprocess.PIPE if command[0] != 'prover9' else os.devnull,
                                    stderr=subprocess.PIPE,
                                    PATH=PATH,
                                    text=True) as proc:
+                if command[0] != 'prover9':
+                    nbsr_stdout = NonBlockingStreamReader(stream=proc.stdout)
+                nbsr_stderr = NonBlockingStreamReader(stream=proc.stderr)
+                last_read = time.time()
                 while proc.poll() is None:
                     time.sleep(0.01)
                     if time.perf_counter() - start > TEST_CASE_TIMEOUT:
@@ -272,10 +279,17 @@ class TestCase:
                         proc.kill()
                         out_stats.status = SATStatus.OUT_OF_MEMORY
                         break
-                    # out_stats.stdout += proc.stdout.read()
-                    # out_stats.stderr += proc.stderr.read()
-                    # print('comminincated', end=' ')
-                out_stats.stdout, out_stats.stderr = proc.communicate()
+                    # print(f'looping {last_read} {time.time()}')
+                    if time.time() - last_read > 1:
+                        if command[0] != 'prover9':
+                            out_stats.stdout = ''.join(nbsr_stdout.readall())
+                        out_stats.stderr = ''.join(nbsr_stderr.readall())
+                        last_read = time.time()
+                # make sure you read everything
+                if command[0] != 'prover9':
+                    out_stats.stdout = ''.join(nbsr_stdout.readall())
+                out_stats.stderr = ''.join(nbsr_stderr.readall())
+
             test_case_stats = TestCaseStatistics(name=self.name,
                                                  command=command,
                                                  input=input_statistics,

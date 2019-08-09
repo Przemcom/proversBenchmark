@@ -30,8 +30,11 @@ if __name__ == '__main__':
     files = sum(len(test_inputs.files) for test_inputs in config.test_inputs)
     test_suites = len(config.test_suites)
     test_cases = sum(len(test_suite.test_cases) for test_suite in config.test_suites)
-    logger.info(
-        f'Starting with {inputs} inputs, {translators} translators, {files} files, {test_suites} test suites, {test_cases} test cases')
+    logger.info(f'Starting with {inputs} inputs, '
+                f'{translators} translators, '
+                f'{files} files, '
+                f'{test_suites} test suites, '
+                f'{test_cases} test cases')
 
     start = time.time()
     benchmark = Benchmark(test_suite=config.test_suites)
