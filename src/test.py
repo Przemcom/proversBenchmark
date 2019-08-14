@@ -150,8 +150,8 @@ class TestCase:
                         last_read = time.time()
                 # make sure you read everything
                 if command[0] != 'prover9':
-                    out_stats.stdout = ''.join(nbsr_stdout.readall())
-                out_stats.stderr = ''.join(nbsr_stderr.readall())
+                    out_stats.stdout += ''.join(nbsr_stdout.readall())
+                out_stats.stderr += ''.join(nbsr_stderr.readall())
 
             test_case_stats = TestCaseStatistics(name=self.name,
                                                  command=command,
