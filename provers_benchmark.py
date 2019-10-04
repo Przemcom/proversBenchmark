@@ -6,7 +6,7 @@ from src import logger
 from src.benchmark import Benchmark
 from src.config import Config
 from src.stats import SerializableJSONEncoder
-from src.test import TestInput
+from src.tests import TestInput
 
 
 def parse_args():
@@ -38,6 +38,8 @@ if __name__ == '__main__':
 
     start = time.time()
     benchmark = Benchmark(test_suite=config.test_suites)
+    if config.test_case_timeout:
+        Benchmark.test_case_timeout = config.test_case_timeout
     stats = benchmark.run()
     with open(config.output_dir, 'w') as outfile:
         logger.info(f'writing results to {config.output_dir}')

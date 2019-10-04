@@ -4,7 +4,6 @@ from dataclasses import dataclass, field, InitVar
 from typing import List, Optional
 
 from src import BenchmarkException, logger
-from src._common import execute
 from src.stats import Serializable
 
 
@@ -43,10 +42,10 @@ class Translator(Serializable):
     def translate(self, input_filename: str, output_filename: str) -> Optional[subprocess.Popen]:
         command = self.get_command(input_filename, output_filename)
         logger.info(f"Translating {input_filename} from {self.from_format} to {self.to_format} to {output_filename}")
-        return execute(command=command,
-                       stdin=input_filename,
-                       stdout=output_filename,
-                       PATH=self.PATH)
+        env = os.environ
+        if self.PATH:
+            env['PATH'] = self.PATH + ':' + env['PATH']
+        return subprocess.Popen(command, stdin=open(input_filename, 'r'), stdout=open(output_filename, 'w'), env=env)
 
     def get_command(self, input_filename: str, output_filename: str) -> List[str]:
         """Command is composed as follows:

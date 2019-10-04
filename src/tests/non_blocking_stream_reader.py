@@ -45,6 +45,3 @@ class NonBlockingStreamReader:
     def readall(self):
         while not self._q.empty():
             yield self._q.get_nowait()
-
-
-class UnexpectedEndOfStream(Exception): pass

@@ -1,7 +1,7 @@
 [general]
 # generate output to
-output_dir="benchmark-output.json"
-test_case_timeout = 300
+output_dir="benchmark-output-test.json"
+test_case_timeout = 1
 
 [[translators]]
 from_format="TPTP"
@@ -16,27 +16,35 @@ options=[]
 
 [[testInputs]]
 # for specifying include/exclude in testCase
-name="tptp_files"
+name="set_1"
 # path to files
-path="tests/data/tptp"
+path="../logit-formula-generator/test_data/data_set_1/"
 # wildcards supported
-files=["*.p"]
-# currently only TPTP
+files=["dataset1_200_10.p"]
+# currently only TPTP and LADR
 format="TPTP"
 
 #[[testInputs]]
 ## for specifying include/exclude in testCase
-#name="prover9_files"
+#name="set_2"
 ## path to files
-#path="tests/data/prover9"
+#path="../logit-formula-generator/test_data/data_set_2/"
 ## wildcards supported
-#files=["*.in"]
-## currently only TPTP
-#format="LADR"
-
+#files=["*.p"]
+#format="TPTP"
+#
+#[[testInputs]]
+## for specifying include/exclude in testCase
+#name="set_3"
+## path to files
+#path="../logit-formula-generator/test_data/data_set_3/"
+## wildcards supported
+#files=["*.p"]
+#format="TPTP"
+#
 # PROVER9
 [[testSuites]]
-name="prover9 tests"
+name="Prover9 test suite"
 # name available in PATH
 executable="prover9"
 # append to path env variable, comment or leave empty to disable
@@ -45,34 +53,62 @@ version="2009-11A"
 # options always appended to executable, comment or leave empty to disable
 #options=[""]
 
-[[testSuites.testCases]]
-# metadata
-name="Prover9 with selected test files"
-# what file format is accepted by prover, input will be automatically translated if possible
-format="LADR"
-# mutually exclusive options input_as_last_argument, input_after_option
-#input_as_last_argument=true
-#input_after_option="-o"
+ [[testSuites.testCases]]
+ # metadata
+ name="Prover9 test set_1"
+ # what file format is accepted by prover, input will be automatically translated if possible
+ format="LADR"
+ # mutually exclusive options input_as_last_argument, input_after_option
+ #input_as_last_argument=true
+ #input_after_option="-o"
+ # mutually exclusive: include or exclude inputs for test. Comment both to test all
+ include_only=["set_1"]
+ #exclude=["set_1", "set_2"]
+ # list of options to test,
+ # set to [] or add empty string as option to run testcase without options
+ options=[]
+#
+# [[testSuites.testCases]]
+# name="Prover9 test set_2"
+# format="LADR"
+# options=[]
+# include_only=["set_2"]
+# #exclude=["set_1", "set_2"]
+#
+#[[testSuites.testCases]]
+#name="Prover9 test set_3"
+#format="LADR"
+#options=[]
+#include_only=["set_3"]
 
-# mutually exclusive: include or exclude inputs for test. Comment both to test all
-#include_only=["prover9_files"]
-#exclude=[""]
-
-# list of options to test,
-# set to [] or add empty string as option to run testcase without options
-options=[]
-
-# SPASS
-[[testSuites]]
-name="spass tests"
-executable="SPASS"
-PATH="../provers/spass39/"
-version="3.9"
-
-[[testSuites.testCases]]
-name="SPASS with selected test files"
-format="TPTP"
-options=[]
-input_after_option="-TPTP"
-
-
+# # SPASS
+# [[testSuites]]
+# name="SPASS test suite"
+# executable="SPASS"
+# PATH="../provers/spass39/"
+# version="3.9"
+# options=["-PStatistic=0", "-PGiven=0", "-DocProof=0", "-PProblem=0"]
+#
+# #[[testSuites.testCases]]
+# #name="SPASS test set_1"
+# #format="TPTP"
+# #options=[]
+# #input_after_option="-TPTP"
+# #include_only=["set_1"]
+# ##exclude=["set_1", "set_2"]
+# #
+# #[[testSuites.testCases]]
+# #name="SPASS test set_2"
+# #format="TPTP"
+# #options=[]
+# #input_after_option="-TPTP"
+# #include_only=["set_2"]
+# ##exclude=["set_1", "set_2"]
+# #
+# [[testSuites.testCases]]
+# name="SPASS test set_3"
+# format="TPTP"
+# options=[]
+# input_after_option="-TPTP"
+# include_only=["set_3"]
+#

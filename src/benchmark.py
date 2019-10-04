@@ -1,14 +1,16 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
-from typing import List
+from typing import List, ClassVar
 
 from src import logger
 from src.stats import Statistics, SATStatus
-from src.test import TestSuite
 
 
 @dataclass
 class Benchmark:
     test_suite: List[TestSuite]
+    test_case_timeout: ClassVar[int] = 300
 
     def run(self) -> Statistics:
         statistics = Statistics()

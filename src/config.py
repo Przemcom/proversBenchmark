@@ -9,7 +9,7 @@ from typing import List, Dict, Type, NoReturn
 import toml
 
 from src import BenchmarkException, ConfigException
-from src.test import TestCase, TestSuite, TestInput
+from src.tests import TestCase, TestSuite, TestInput
 from src.translators import Translator
 
 
@@ -18,6 +18,7 @@ class DictPoper:
     """Convenience class for removing items from dictionary
     use with context manager to print warning if dictionary was not emptied
     """
+
     def __init__(self, source: dict, logger: logging.Logger = logging, *args, **kwargs):
         """source is dictionry that will be consumed
         log any errors to logger
@@ -87,14 +88,15 @@ class DictPoper:
 
 @dataclass
 class Config:
-    config_file: str = "config.toml"
-    output_dir: str = "benchmark-output"
-    log_file: str = "benchmark.log"
+    config_file: str = 'config.toml'
+    output_dir: str = 'benchmark-output'
+    log_file: str = 'benchmark.log'
     test_suites: List[TestSuite] = field(default_factory=list)
     test_inputs: List[TestInput] = field(default_factory=list)
+    test_case_timeout: int = None
 
     _load_errors_occured: bool = False
-    _logger: logging.Logger = logging.getLogger("BenchmarkConfig")
+    _logger: logging.Logger = logging.getLogger('BenchmarkConfig')
 
     def __post_init__(self):
         self._logger.setLevel(logging.DEBUG)
@@ -106,17 +108,16 @@ class Config:
             self._error(f"Config file '{self.config_file}'' is not found/not a file")
             return
 
-        with open(self.config_file) as source:
-            benchmark_config = toml.load(self.config_file)
+        benchmark_config = toml.load(self.config_file)
 
         with DictPoper(benchmark_config, self._logger, self.config_file) as poper:
-            general_config, _ = poper.pop_key("general", required=True, type_check=dict)
+            general_config, _ = poper.pop_key('general', required=True, type_check=dict)
             self._load_general(general_config)
-            translators_config, _ = poper.pop_key("translators", required=True, type_check=list)
+            translators_config, _ = poper.pop_key('translators', required=True, type_check=list)
             self._load_translators(translators_config)
-            test_inputs_config, _ = poper.pop_key("testInputs", required=True, type_check=list)
+            test_inputs_config, _ = poper.pop_key('testInputs', required=True, type_check=list)
             self._load_test_inputs(test_inputs_config)
-            test_suites_config, _ = poper.pop_key("testSuites", required=True, type_check=list)
+            test_suites_config, _ = poper.pop_key('testSuites', required=True, type_check=list)
             self._load_test_suites(test_suites_config)
 
             if poper.errors_occured or self._load_errors_occured:
@@ -128,16 +129,15 @@ class Config:
 
     def _load_general(self, general_config: Dict) -> NoReturn:
         with DictPoper(general_config, self._logger, "[general]", copy.deepcopy(general_config)) as poper:
-
             self.output_dir, _ = poper.pop_key(variable="output_dir",
                                                default=self.output_dir,
                                                required=False,
                                                type_check=str)
 
-            TEST_CASE_TIMEOUT, _ = poper.pop_key(variable="test_case_timeout",
-                                                 default=300,
-                                                 required=False,
-                                                 type_check=int)
+            self.test_case_timeout, _ = poper.pop_key(variable="test_case_timeout",
+                                                      default=None,
+                                                      required=False,
+                                                      type_check=int)
             # todo check is is writeable (should be dir or file?
 
     def _load_translators(self, translators_config: List) -> NoReturn:
