@@ -2,14 +2,14 @@ from __future__ import annotations
 
 import re
 
-from src.parsers._parsers import InputParser
-from src.stats import SATStatistics, SATType
+from src.parsers.parsers import StatisticParser
+from src.stats import ConjunctiveNormalFormFirstOrderLogicSATStatistics, SATType
 
 
-class TPTPParser(InputParser):
+class TPTPParser(StatisticParser):
     @staticmethod
-    def get_file_input_statistics(file_path: str) -> SATStatistics:
-        stats = SATStatistics(path=file_path, format='tptp')
+    def get_file_input_statistics(file_path: str) -> ConjunctiveNormalFormFirstOrderLogicSATStatistics:
+        stats = ConjunctiveNormalFormFirstOrderLogicSATStatistics(path=file_path, format='tptp')
 
         with open(file_path) as source:
             file_contens = source.read()

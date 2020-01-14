@@ -6,3 +6,5 @@ inputs
 .venv
 venv
 benchmark.log
+config*
+*.json

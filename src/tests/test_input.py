@@ -6,26 +6,10 @@ from dataclasses import dataclass, field
 from typing import List, ClassVar, Tuple, Optional
 
 from src import BenchmarkException, logger
-from src.parsers import get_input_parser
-from src.stats import SATStatistics, Serializable
+from src.parsers.parsers import get_statistics_parser
+from src.stats import Serializable, \
+    MinimalSATStatistics
 from src.translators import Translator
-
-
-# class CustomPool:
-#     max_processes = 8
-#
-#     def __init__(self):
-#         self.processes = []
-#
-#     def add(self, proc):
-#         while len([proc for proc in self.processes if proc.poll() is None]) >= self.max_processes:
-#             time.sleep(1)
-#         self.processes.append(proc)
-#
-#     def wait(self):
-#         # if any process is running
-#         while any([proc for proc in self.processes if proc.poll() is None]):
-#             time.sleep(0.1)
 
 
 @dataclass
@@ -35,6 +19,8 @@ class TestInput(Serializable):
     cwd: str = os.getcwd()
     path: str = None
     files: List[str] = field(default_factory=list)
+    gather_statistics_from_json_file: bool = False
+    gather_statistics_from_formula_file: bool = False
 
     translators: ClassVar[List[Translator]] = []
 
@@ -49,17 +35,25 @@ class TestInput(Serializable):
                 raise BenchmarkException(f"file {file} does not exists (is not a file)", self)
 
     # todo add caching, make it static
-    def get_file_statistics(self, file_path: str) -> SATStatistics:
-        # workaround: look for tptp header
-
-        if self.format != 'TPTP':
+    def get_file_statistics(self, file_path: str):
+        # [MinimalSATStatistics, ConjunctiveNormalFormFirstOrderLogicSATStatistics, ConjunctiveNormalFormPropositionalTemporalLogicFormulaInfo]:
+        parser = get_statistics_parser(format_name=self.format)
+        min_stats = MinimalSATStatistics(name=self.name, path=file_path)
+        if not parser:
             logger.warning(f'no statistics available for format {self.format}. Only TPTP stats are supported')
-        parser = get_input_parser('tptp')
-        if parser:
+            # todo return basic stats even if there is no parser
+            return min_stats, None
+
+        if self.gather_statistics_from_formula_file:
             stats = parser.get_file_input_statistics(file_path=file_path)
             stats.name = self.name
-            return stats
-        return SATStatistics(name=self.name)
+            return min_stats, stats
+        if self.gather_statistics_from_json_file:
+            prefix, _ext = os.path.splitext(file_path)
+            stats = parser.get_file_input_statistics(prefix + '.json')
+            stats.name = self.name
+            return min_stats, stats
+        return MinimalSATStatistics(name=self.name, path=file_path), None
 
     # todo add caching
     def as_format(self, desired_format: str) -> Tuple[List[str], List[str], List[Optional[Translator]]]:
@@ -80,12 +74,10 @@ class TestInput(Serializable):
             raise BenchmarkException(f"No translator from {self.format} to {desired_format} found")
 
         pool = ProcessPoolExecutor(max_workers=8)
-        # pool = CustomPool()
         out_file_paths = []
         translators = []
         for file in self.files:
             in_file_path = os.path.realpath(os.path.join(self.path, file))
-
             # /cwd/self._cache_path/self.name/desired_format/dir_structure(file)/file.extension
             out_file_path = os.path.join(self.cwd,
                                          TestInput.cache_path,

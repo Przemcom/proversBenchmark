@@ -15,9 +15,10 @@ class TestSuite:
     executable: str
     cwd: InitVar[str] = os.getcwd()
     PATH: str = None
+    capture_stdout: bool = True
     version: str = None
     options: List[str] = field(default_factory=list)
-    test_cases: List[TestCase] = field(default_factory=list)
+    test_runs: List[TestRun] = field(default_factory=list)
     test_inputs: List[TestInput] = field(default_factory=list)
 
     def __post_init__(self, cwd):
@@ -29,16 +30,15 @@ class TestSuite:
 
     def run(self) -> TestSuiteStatistics:
         """Synchronously run all test cases defined in this test suite"""
-        test_suite_stats = TestSuiteStatistics(program_name=self.executable,
-                                               program_version=self.version)
-        for test_case in self.test_cases:
+        from src.tests import TestRun
+        test_suite_stats = TestSuiteStatistics(program_name=self.executable, program_version=self.version)
+        for test_run in self.test_runs:
             try:
-                for test_input in test_case.filter_inputs(self.test_inputs):
-                    test_case_stats = test_case.run(executable=self.executable,
-                                                    options=self.options,
-                                                    PATH=self.PATH,
-                                                    test_input=test_input)
-                    test_suite_stats.test_cases.extend(test_case_stats)
+                for test_input in test_run.filter_inputs(self.test_inputs):
+                    test_run: TestRun
+                    test_run_stats = test_run.run(executable=self.executable, options=self.options, PATH=self.PATH,
+                                                  test_input=test_input, capture_stdout=self.capture_stdout)
+                    test_suite_stats.test_run.extend(test_run_stats)
             except BenchmarkException as e:
                 logger.error(e)
                 continue

@@ -23,12 +23,12 @@ class Benchmark:
         timeout = 0
         different = 0
         for test_suite in statistics.test_suites:
-            for test_case in test_suite.test_cases:
-                if test_case.output.status == SATStatus.TIMEOUT:
+            for test_run in test_suite.test_run:
+                if test_run.output.status == SATStatus.TIMEOUT:
                     timeout += 1
-                if test_case.output.status == SATStatus.SATISFIABLE:
+                elif test_run.output.status == SATStatus.SATISFIABLE:
                     sat += 1
-                if test_case.output.status == SATStatus.UNSATISFIABLE:
+                elif test_run.output.status == SATStatus.UNSATISFIABLE:
                     unsat += 1
                 else:
                     different += 1

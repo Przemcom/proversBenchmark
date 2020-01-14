@@ -10,14 +10,14 @@ import psutil
 
 from src import BenchmarkException, logger
 from src.benchmark import Benchmark
-from src.parsers import get_output_parser
-from src.stats import TestCaseStatistics, SATStatus, OutputStatistics, MonitoredProcess
+from src.parsers.parsers import get_output_parser
+from src.stats import TestRunStatistics, SATStatus, OutputStatistics, MonitoredProcess
 from src.tests.non_blocking_stream_reader import NonBlockingStreamReader
 from src.tests.test_input import TestInput
 
 
 @dataclass
-class TestCase:
+class TestRun:
     name: str
     options: List[str]
     format: str
@@ -64,14 +64,15 @@ class TestCase:
             result.extend(test_input for test_input in test_inputs if test_input.name not in self.include_only)
         return result
 
-    def run(self, executable: str, options: List[str], PATH: str, test_input: TestInput) -> Generator[
-        TestCaseStatistics]:
+    def run(self, executable: str, options: List[str], PATH: str, test_input: TestInput, capture_stdout: bool, ) -> \
+            Generator[
+                TestRunStatistics]:
         """Synchronously runs executable with options and self.options against all files in test_input"""
         logger.info(f'Running testcase {self.name}')
         original_paths, translated_file_paths, translators = test_input.as_format(self.format)
         for original_paths, test_input_path, translator in zip(original_paths, translated_file_paths, translators):
-            input_statistics = test_input.get_file_statistics(file_path=original_paths)
-            input_statistics.translated_with = translator
+            minimal_statistics, input_statistics = test_input.get_file_statistics(file_path=original_paths)
+            minimal_statistics.translated_with = translator
             command = self.build_command(executable=executable, input_filepath=test_input_path, suite_options=options)
             logger.info(f'Executing {command}')
 
@@ -95,36 +96,37 @@ class TestCase:
                         proc.kill()
                         out_stats.status = SATStatus.OUT_OF_MEMORY
                         break
-                    # print(f'looping {last_read} {time.time()}')
                     if time.time() - last_read > 1:
-                        if command[0] != 'prover9':
+                        if capture_stdout:
                             out_stats.stdout = ''.join(nbsr_stdout.readall())
                         out_stats.stderr = ''.join(nbsr_stderr.readall())
                         last_read = time.time()
-                # make sure you read everything
-                out_stats.stdout += ''.join(nbsr_stdout.readall())
+                if capture_stdout:
+                    out_stats.stdout += ''.join(nbsr_stdout.readall())
+                else:
+                    # clean buffer
+                    nbsr_stdout.readall()
+                # we want all stderr
                 out_stats.stderr += ''.join(nbsr_stderr.readall())
 
-            test_case_stats = TestCaseStatistics(name=self.name, command=command, input=input_statistics,
-                                                 execution_statistics=proc.get_statistics())
-
-            out_stats.returncode = proc.returncode
-            if out_stats.status is not None:
-                pass
-            else:
-                parser = get_output_parser(solver=executable)
-                if parser:
-                    out_stats.status = parser.parse_output(returncode=out_stats.returncode, stdout=out_stats.stdout,
-                                                           stderr=out_stats.stderr)
+            test_case_stats = TestRunStatistics(
+                name=self.name, command=command, minimal_input_statistics=minimal_statistics,
+                input_statistics=input_statistics, execution_statistics=proc.get_statistics())
+            if out_stats.status is None:
+                out_parser = get_output_parser(solver=executable)
+                if out_parser:
+                    out_stats.status = out_parser.parse_output(
+                        returncode=test_case_stats.execution_statistics.returncode,
+                        stdout=out_stats.stdout, stderr=out_stats.stderr)
                 else:
                     logger.warning('There is no parser to set output SAT status TODO')
                     out_stats.status = SATStatus.UNKOWN
             test_case_stats.output = out_stats
-        logger.info(f"Testcase '{self.name}' took "
-                    f"{test_case_stats.execution_statistics.execution_time:.2f}, "
-                    f"status: {test_case_stats.output.status}, "
-                    f"return code: {test_case_stats.output.returncode}")
-        yield test_case_stats
+            logger.info(f"Testcase '{self.name}' took "
+                        f"{test_case_stats.execution_statistics.execution_time:.2f}, "
+                        f"status: {test_case_stats.output.status}, "
+                        f"return code: {test_case_stats.execution_statistics.returncode}")
+            yield test_case_stats
 
 
 if __name__ == '__main__':

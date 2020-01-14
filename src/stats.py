@@ -5,7 +5,7 @@ import subprocess
 import time
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import List
+from typing import List, Dict, Union
 
 import psutil
 
@@ -42,6 +42,7 @@ class ExecutionStatistics(Serializable):
     peak_memory: int = None
     disk_reads: int = None
     disk_writes: int = None
+    returncode: int = None
 
     def update(self, proc: psutil.Process):
         try:
@@ -92,6 +93,7 @@ class MonitoredProcess(subprocess.Popen):
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.exec_stats.execution_time = time.perf_counter() - self._start
+        self.exec_stats.returncode = self.returncode
 
 
 class SATType(Enum):
@@ -120,11 +122,15 @@ class HardwareStatistics(Serializable):
 
 
 @dataclass
-class SATStatistics(Serializable):
+class MinimalSATStatistics(Serializable):
     name: str = None
     path: str = None
     # list of commands used to translate
     translated_with: List[List[str]] = field(default_factory=list)
+
+
+@dataclass
+class ConjunctiveNormalFormFirstOrderLogicSATStatistics(Serializable):
     SAT_type: SATType = None
     format: str = None
     number_of_clauses: int = None
@@ -147,6 +153,17 @@ class SATStatistics(Serializable):
 
 
 @dataclass
+class ConjunctiveNormalFormPropositionalTemporalLogicFormulaInfo(Serializable):
+    number_of_variables: int = 0
+    number_of_clauses: int = 0
+    max_clause_size: int = 0
+    clause_sizes: Dict[int, int] = field(default_factory=dict)
+    """Dict[clause_size, number_of_cluases]"""
+    number_of_variables_with_always_connectives: int = 0
+    number_of_variables_with_eventually_connectives: int = 0
+    number_of_variables_without_connective: int = 0
+
+
 class SATStatus(Enum):
     ERROR = "error"
     SATISFIABLE = "satisfiable"
@@ -158,18 +175,20 @@ class SATStatus(Enum):
 
 @dataclass
 class OutputStatistics(Serializable):
-    returncode: int = None
     status: SATStatus = None
     stderr: str = ''
     stdout: str = ''
 
 
 @dataclass
-class TestCaseStatistics(Serializable):
+class TestRunStatistics(Serializable):
     name: str
     command: List[str]
     execution_statistics: ExecutionStatistics = None
-    input: SATStatistics = None
+    minimal_input_statistics: MinimalSATStatistics = None
+    input_statistics: Union[
+        ConjunctiveNormalFormFirstOrderLogicSATStatistics,
+        ConjunctiveNormalFormPropositionalTemporalLogicFormulaInfo] = None
     output: OutputStatistics = None
 
 
@@ -177,7 +196,7 @@ class TestCaseStatistics(Serializable):
 class TestSuiteStatistics(Serializable):
     program_name: str
     program_version: str
-    test_cases: List[TestCaseStatistics] = field(default_factory=list)
+    test_run: List[TestRunStatistics] = field(default_factory=list)
 
 
 @dataclass
@@ -201,8 +220,8 @@ if __name__ == '__main__':
             time.sleep(0.1)
 
     stats = running_process.get_statistics()
-    test_case_stats = TestCaseStatistics(name="test",
-                                         command=["ps", "-aux"],
-                                         execution_statistics=stats,
-                                         input=SATStatistics())
+    test_case_stats = TestRunStatistics(name="test",
+                                        command=["ps", "-aux"],
+                                        execution_statistics=stats,
+                                        input=ConjunctiveNormalFormFirstOrderLogicSATStatistics())
     print(json.dumps(test_case_stats, default=SerializableJSONEncoder))

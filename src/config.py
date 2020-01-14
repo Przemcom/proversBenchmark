@@ -9,7 +9,7 @@ from typing import List, Dict, Type, NoReturn
 import toml
 
 from src import BenchmarkException, ConfigException
-from src.tests import TestCase, TestSuite, TestInput
+from src.tests import TestRun, TestSuite, TestInput
 from src.translators import Translator
 
 
@@ -113,7 +113,7 @@ class Config:
         with DictPoper(benchmark_config, self._logger, self.config_file) as poper:
             general_config, _ = poper.pop_key('general', required=True, type_check=dict)
             self._load_general(general_config)
-            translators_config, _ = poper.pop_key('translators', required=True, type_check=list)
+            translators_config, _ = poper.pop_key('translators', required=False, type_check=list)
             self._load_translators(translators_config)
             test_inputs_config, _ = poper.pop_key('testInputs', required=True, type_check=list)
             self._load_test_inputs(test_inputs_config)
@@ -141,6 +141,8 @@ class Config:
             # todo check is is writeable (should be dir or file?
 
     def _load_translators(self, translators_config: List) -> NoReturn:
+        if not translators_config:
+            return
         for translator_config in translators_config:
             # for error reporting
             with DictPoper(translator_config, self._logger, "[[translators]]",
@@ -226,6 +228,12 @@ class Config:
                 patterns, _ = poper.pop_key(variable="files",
                                             required=True,
                                             type_check=list)
+                gather_statistics_from_json_file, _ = poper.pop_key(
+                    variable="gather_statistics_from_json_file",
+                    required=False, type_check=bool)
+                gather_statistics_from_formula_file, _ = poper.pop_key(
+                    variable="gather_statistics_from_formula_file",
+                    required=False, type_check=bool)
 
                 files = []
                 prefix = path if os.path.isabs(path) else os.path.join(os.getcwd(), path)
@@ -246,10 +254,10 @@ class Config:
                     continue
 
             try:
-                test_input = TestInput(name=name,
-                                       path=prefix,
-                                       format=format,
-                                       files=files)
+                test_input = TestInput(
+                    name=name, path=prefix, format=format, files=files,
+                    gather_statistics_from_formula_file=gather_statistics_from_formula_file,
+                    gather_statistics_from_json_file=gather_statistics_from_json_file)
             except BenchmarkException as e:
                 self._error(e)
             else:
@@ -285,30 +293,32 @@ class Config:
                                                   type_check=list,
                                                   required=False)
 
+                capture_stdout, _ = poper.pop_key(variable="capture_stdout",
+                                                  default=True,
+                                                  type_check=bool,
+                                                  required=False)
+
                 if poper.errors_occured:
                     continue
 
                 try:
-                    test_suite = TestSuite(name=name,
-                                           PATH=PATH,
-                                           version=version,
-                                           executable=executable,
+                    test_suite = TestSuite(name=name, PATH=PATH, version=version, executable=executable,
                                            options=[option.strip() for option in static_options],
-                                           test_inputs=self.test_inputs)
-                    self._load_test_cases(test_suite_config, test_suite)
+                                           test_inputs=self.test_inputs, capture_stdout=capture_stdout)
+                    self._load_test_runs(test_suite_config, test_suite)
                 except BenchmarkException as e:
                     self._error(e)
                 else:
                     self.test_suites.append(test_suite)
 
-    def _load_test_cases(self, config: Dict, test_suite: TestSuite) -> NoReturn:
-        test_cases_config = config.pop("testCases", None)
-        if test_cases_config is None:
+    def _load_test_runs(self, config: Dict, test_suite: TestSuite) -> NoReturn:
+        test_runs_config = config.pop("testRuns", None)
+        if test_runs_config is None:
             self._error("You must define at least one testCase")
             return
 
-        for test_case_config in test_cases_config:
-            with DictPoper(test_case_config, self._logger, "[[testSuites.testCases]]",
+        for test_case_config in test_runs_config:
+            with DictPoper(test_case_config, self._logger, "[[testSuites.testRuns]]",
                            copy.deepcopy(test_case_config)) as poper:
                 name, _ = poper.pop_key(variable="name",
                                         required=True,
@@ -358,18 +368,18 @@ class Config:
                     continue
 
             try:
-                test_case = TestCase(name=name,
-                                     format=format,
-                                     input_after_option=input_after_option,
-                                     input_as_last_argument=input_as_last_arg,
-                                     exclude=exclude,
-                                     include_only=include_only,
-                                     options=options)
+                test_run = TestRun(name=name,
+                                   format=format,
+                                   input_after_option=input_after_option,
+                                   input_as_last_argument=input_as_last_arg,
+                                   exclude=exclude,
+                                   include_only=include_only,
+                                   options=options)
             except BenchmarkException as e:
                 self._error(e)
                 # self._logger.error(f"{e.args[0]} in {e.args[1:]}")
             else:
-                test_suite.test_cases.append(test_case)
+                test_suite.test_runs.append(test_run)
 
     def _error(self, message):
         self._load_errors_occured = True
