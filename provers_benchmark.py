@@ -2,10 +2,10 @@ import argparse
 import json
 import time
 
-from src import logger
 from src.benchmark import Benchmark
 from src.config import Config
-from src.stats import SerializableJSONEncoder
+from src.log import init_log, get_logger
+from src.statistics.json_encoder import ClassAsDictJSONEncoder
 from src.tests import TestInput
 
 
@@ -22,6 +22,8 @@ def parse_args():
 
 if __name__ == '__main__':
     args = parse_args()
+    init_log()
+    logger = get_logger()
 
     config = Config(config_file=args.file)
     config.load_config()
@@ -43,5 +45,5 @@ if __name__ == '__main__':
     stats = benchmark.run()
     with open(config.output_dir, 'w') as outfile:
         logger.info(f'writing results to {config.output_dir}')
-        json.dump(stats, outfile, indent=2, cls=SerializableJSONEncoder)
+        json.dump(stats, outfile, indent=2, cls=ClassAsDictJSONEncoder)
     logger.info(f'Benchmark was running for {time.time() - start:.2f} seconds in total')

@@ -5,15 +5,17 @@ from concurrent.futures.process import ProcessPoolExecutor
 from dataclasses import dataclass, field
 from typing import List, ClassVar, Tuple, Optional
 
-from src import BenchmarkException, logger
+from src.errors import BenchmarkException
+from src.log import get_logger
 from src.parsers.parsers import get_statistics_parser
-from src.stats import Serializable, \
-    MinimalSATStatistics
+from src.statistics.stats import MinimalSATStatistics
 from src.translators import Translator
+
+logger = get_logger()
 
 
 @dataclass
-class TestInput(Serializable):
+class TestInput:
     name: str
     format: str
     cwd: str = os.getcwd()
@@ -38,7 +40,7 @@ class TestInput(Serializable):
     def get_file_statistics(self, file_path: str):
         # [MinimalSATStatistics, ConjunctiveNormalFormFirstOrderLogicSATStatistics, ConjunctiveNormalFormPropositionalTemporalLogicFormulaInfo]:
         parser = get_statistics_parser(format_name=self.format)
-        min_stats = MinimalSATStatistics(name=self.name, path=file_path)
+        min_stats = MinimalSATStatistics(name=self.name, path=file_path, format=self.format)
         if not parser:
             logger.warning(f'no statistics available for format {self.format}. Only TPTP stats are supported')
             # todo return basic stats even if there is no parser
@@ -49,10 +51,12 @@ class TestInput(Serializable):
             stats.name = self.name
             return min_stats, stats
         if self.gather_statistics_from_json_file:
-            prefix, _ext = os.path.splitext(file_path)
-            stats = parser.get_file_input_statistics(prefix + '.json')
-            stats.name = self.name
-            return min_stats, stats
+            try:
+                stats = parser.get_file_input_statistics(file_path + '.json')
+                stats.name = self.name
+                return min_stats, stats
+            except FileNotFoundError:
+                logger.warning(f'Statictics for {file_path} not available (not found file {file_path}.json)')
         return MinimalSATStatistics(name=self.name, path=file_path), None
 
     # todo add caching
@@ -91,7 +95,8 @@ class TestInput(Serializable):
             out_file_path = os.path.join(dirname, os.path.splitext(filename)[0] + extension)
 
             future = pool.submit(translator.translate, in_file_path, out_file_path)
-            future.add_done_callback(lambda x: print('ok'))
+            future.add_done_callback(lambda x: logger.info(
+                f"Translated {in_file_path} from {translator.from_format} to {translator.to_format} to {out_file_path}"))
 
             out_file_paths.append(out_file_path)
             translators.append(translator)

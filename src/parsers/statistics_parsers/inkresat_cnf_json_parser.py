@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 
 from src.parsers.parsers import StatisticParser
-from src.stats import ConjunctiveNormalFormPropositionalTemporalLogicFormulaInfo
+from src.statistics.stats import ConjunctiveNormalFormPropositionalTemporalLogicFormulaInfo
 
 
 class InkresatCNFPTLStatisticParser(StatisticParser):

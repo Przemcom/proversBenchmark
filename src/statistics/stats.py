@@ -1,7 +1,6 @@
 import datetime
 import json
 import platform
-import subprocess
 import time
 from dataclasses import dataclass, field
 from enum import Enum
@@ -9,33 +8,11 @@ from typing import List, Dict, Union
 
 import psutil
 
-
-class SerializableJSONEncoder(json.JSONEncoder):
-    """This encoder can encode Enum and classes that inherit Serializable
-    Usage json.dumps(variable, cls=SerializableJSONEncoder)
-    """
-
-    def default(self, o):
-        if isinstance(o, Serializable):
-            return o.as_plain_dict()
-        if isinstance(o, Enum):
-            return o.value
-        return super().default(o)
-
-
-class Serializable:
-    def as_plain_dict(self):
-        """Convert to dict that holds only basic types"""
-        # todo ignore variables that start with _
-        class_dict = self.__dict__.copy()
-        for key, value in self.__dict__.items():
-            if key.startswith('_') or key.startswith(self.__class__.__name__):
-                class_dict.pop(key)
-        return class_dict
+from src.statistics.json_encoder import ClassAsDictJSONEncoder
 
 
 @dataclass
-class ExecutionStatistics(Serializable):
+class ExecutionStatistics:
     # todo which cpu times do we need?
     cpu_time = None
     execution_time: float = 0
@@ -59,43 +36,6 @@ class ExecutionStatistics(Serializable):
         self.cpu_time = proc.cpu_times()
 
 
-class MonitoredProcess(subprocess.Popen):
-    """Start process that can be monitored by periodic calling poll() in active loop
-    Note that:
-    poll() must be called at least once to get proper statistics
-    short running process can exit before poll method was executed
-    use with context manager to auto stop execution time
-    """
-
-    def __init__(self, *args, **kwargs):
-        self.exec_stats = ExecutionStatistics()
-        super().__init__(*args, **kwargs)
-        self._start = time.perf_counter()
-        self.proc = psutil.Process(self.pid)
-        self.poll()
-
-    def poll(self):
-        if super().poll() is not None:
-            return super().poll()
-
-        # can not do it in __exit__, because process no longer not exists there
-        self.exec_stats.update(self.proc)
-
-        return None
-
-    def stop(self):
-        """If not used with contex manager, stop counting execution time"""
-        self.__exit__(None, None, None)
-
-    def get_statistics(self) -> ExecutionStatistics:
-        """Return gathered statistics"""
-        return self.exec_stats
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.exec_stats.execution_time = time.perf_counter() - self._start
-        self.exec_stats.returncode = self.returncode
-
-
 class SATType(Enum):
     FOF = "First-order Formula"
     CNF = "Conjunctive Normal Form"
@@ -104,7 +44,7 @@ class SATType(Enum):
 
 
 @dataclass
-class CPUStatistics(Serializable):
+class CPUStatistics:
     name: str = platform.processor()
     min_frequency: float = psutil.cpu_freq().min
     max_frequency: float = psutil.cpu_freq().max
@@ -113,7 +53,7 @@ class CPUStatistics(Serializable):
 
 
 @dataclass
-class HardwareStatistics(Serializable):
+class HardwareStatistics:
     system: str = platform.system()
     release: str = platform.release()
     version: str = platform.version()
@@ -122,17 +62,17 @@ class HardwareStatistics(Serializable):
 
 
 @dataclass
-class MinimalSATStatistics(Serializable):
+class MinimalSATStatistics:
     name: str = None
     path: str = None
+    format: str = None
     # list of commands used to translate
     translated_with: List[List[str]] = field(default_factory=list)
 
 
 @dataclass
-class ConjunctiveNormalFormFirstOrderLogicSATStatistics(Serializable):
+class ConjunctiveNormalFormFirstOrderLogicSATStatistics:
     SAT_type: SATType = None
-    format: str = None
     number_of_clauses: int = None
     number_of_unit_clauses: int = None
     number_of_atoms: int = None
@@ -153,7 +93,7 @@ class ConjunctiveNormalFormFirstOrderLogicSATStatistics(Serializable):
 
 
 @dataclass
-class ConjunctiveNormalFormPropositionalTemporalLogicFormulaInfo(Serializable):
+class ConjunctiveNormalFormPropositionalTemporalLogicFormulaInfo:
     number_of_variables: int = 0
     number_of_clauses: int = 0
     max_clause_size: int = 0
@@ -174,14 +114,14 @@ class SATStatus(Enum):
 
 
 @dataclass
-class OutputStatistics(Serializable):
+class OutputStatistics:
     status: SATStatus = None
     stderr: str = ''
     stdout: str = ''
 
 
 @dataclass
-class TestRunStatistics(Serializable):
+class TestRunStatistics:
     name: str
     command: List[str]
     execution_statistics: ExecutionStatistics = None
@@ -193,19 +133,14 @@ class TestRunStatistics(Serializable):
 
 
 @dataclass
-class TestSuiteStatistics(Serializable):
+class TestSuiteStatistics:
     program_name: str
     program_version: str
     test_run: List[TestRunStatistics] = field(default_factory=list)
 
 
 @dataclass
-class Statistics(Serializable):
-    def as_plain_dict(self):
-        dict_copy = self.__dict__.copy()
-        dict_copy["date"] = str(self.date)
-        return dict_copy
-
+class Statistics:
     test_suites: List[TestSuiteStatistics] = field(default_factory=list)
     date: datetime.datetime = datetime.datetime.now()
     hardware: HardwareStatistics = HardwareStatistics()
@@ -213,6 +148,7 @@ class Statistics(Serializable):
 
 if __name__ == '__main__':
     import functools
+    from src.statistics.monitored_process import MonitoredProcess
 
     proc = functools.partial(MonitoredProcess, ['sleep', '5'])
     with proc() as running_process:
@@ -220,8 +156,6 @@ if __name__ == '__main__':
             time.sleep(0.1)
 
     stats = running_process.get_statistics()
-    test_case_stats = TestRunStatistics(name="test",
-                                        command=["ps", "-aux"],
-                                        execution_statistics=stats,
-                                        input=ConjunctiveNormalFormFirstOrderLogicSATStatistics())
-    print(json.dumps(test_case_stats, default=SerializableJSONEncoder))
+    test_case_stats = TestRunStatistics(name="test", command=["ps", "-aux"], execution_statistics=stats,
+                                        minimal_input_statistics=ConjunctiveNormalFormFirstOrderLogicSATStatistics())
+    print(json.dumps(test_case_stats, default=ClassAsDictJSONEncoder))

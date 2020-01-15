@@ -4,10 +4,12 @@ import os
 from dataclasses import dataclass, field, InitVar
 from typing import List
 
-from src import BenchmarkException, logger
-from src.stats import TestSuiteStatistics
+from src.errors import BenchmarkException
+from src.log import get_logger
+from src.statistics.stats import TestSuiteStatistics
 from src.tests.test_input import TestInput
 
+logger = get_logger()
 
 @dataclass
 class TestSuite:

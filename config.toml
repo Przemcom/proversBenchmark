@@ -28,12 +28,14 @@ name="set_1"
 path="../logit-formula-generator/test_data/data_set_1/"
 files=["*.p"]
 format="TPTP"
+gather_statistics_from_json_file=true
 
-[[testInputs]]
-name="set_2"
-path="../logit-formula-generator/test_data/data_set_2/"
-files=["*.p"]
-format="TPTP"
+#[[testInputs]]
+#name="set_2"
+#path="../logit-formula-generator/test_data/data_set_2/"
+#files=["*.p"]
+#format="TPTP"
+#gather_statistics_from_json_file=true
 
 
 # PROVER9
@@ -51,16 +53,9 @@ capture_stdout=false
 [[testSuites.testRuns]]
 name="Prover9 test set_1"
 format="LADR"
-include_only=["set_1"]
+#include_only=["set_1"]
 #exclude=["set_1", "set_2"]
 options=[]
-
-[[testSuites.testRuns]]
-name="Prover9 test set_2"
-format="LADR"
-options=[]
-include_only=["set_2"]
-#exclude=["set_1", "set_2"]
 
 # SPASS
 [[testSuites]]
@@ -78,15 +73,5 @@ options=[]
 input_after_option="-TPTP"
 include_only=["set_1"]
 #exclude=["set_1", "set_2"]
-
-[[testSuites.testRuns]]
-name="SPASS test set_2"
-format="TPTP"
-options=[]
-input_after_option="-TPTP"
-include_only=["set_2"]
-#exclude=["set_1", "set_2"]
-
-
 
 

@@ -3,8 +3,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import List, ClassVar
 
-from src import logger
-from src.stats import Statistics, SATStatus
+from src.log import get_logger
+from src.statistics.stats import Statistics, SATStatus
+
+logger = get_logger()
 
 
 @dataclass

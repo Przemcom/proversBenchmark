@@ -1,7 +1,7 @@
 from typing import Optional
 
 from src.parsers.parsers import OutputParser
-from src.stats import SATStatus
+from src.statistics.stats import SATStatus
 
 
 class SpassParser(OutputParser):

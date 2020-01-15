@@ -8,7 +8,7 @@ from typing import List, Dict, Type, NoReturn
 
 import toml
 
-from src import BenchmarkException, ConfigException
+from src.errors import ConfigException, BenchmarkException
 from src.tests import TestRun, TestSuite, TestInput
 from src.translators import Translator
 

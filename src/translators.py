@@ -3,12 +3,14 @@ import subprocess
 from dataclasses import dataclass, field, InitVar
 from typing import List, Optional
 
-from src import BenchmarkException, logger
-from src.stats import Serializable
+from src.errors import BenchmarkException
+from src.log import get_logger
+
+logger = get_logger()
 
 
 @dataclass
-class Translator(Serializable):
+class Translator:
     """Translate text to different syntax by calling executable
     by default input file is piped to stdin, stdout is piped to output file
     if input_as_last_argument is True, input_filename will be last arguments
@@ -41,7 +43,6 @@ class Translator(Serializable):
 
     def translate(self, input_filename: str, output_filename: str) -> Optional[subprocess.Popen]:
         command = self.get_command(input_filename, output_filename)
-        logger.info(f"Translating {input_filename} from {self.from_format} to {self.to_format} to {output_filename}")
         env = os.environ
         if self.PATH:
             env['PATH'] = self.PATH + ':' + env['PATH']

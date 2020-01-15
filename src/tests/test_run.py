@@ -8,12 +8,16 @@ from typing import List, Generator
 
 import psutil
 
-from src import BenchmarkException, logger
 from src.benchmark import Benchmark
+from src.errors import BenchmarkException
+from src.log import get_logger
 from src.parsers.parsers import get_output_parser
-from src.stats import TestRunStatistics, SATStatus, OutputStatistics, MonitoredProcess
+from src.statistics.monitored_process import MonitoredProcess
+from src.statistics.stats import TestRunStatistics, SATStatus, OutputStatistics
 from src.tests.non_blocking_stream_reader import NonBlockingStreamReader
 from src.tests.test_input import TestInput
+
+logger = get_logger()
 
 
 @dataclass
