@@ -73,23 +73,23 @@ class MinimalSATStatistics:
 @dataclass
 class ConjunctiveNormalFormFirstOrderLogicSATStatistics:
     SAT_type: SATType = None
-    number_of_clauses: int = None
-    number_of_unit_clauses: int = None
-    number_of_atoms: int = None
-    maximal_clause_size: int = None
-    average_clause_size: int = None
-    number_of_predicates: int = None
-    predicate_arities: str = None
-    number_of_functors: int = None
-    number_of_constant_functors: int = None
-    functor_arities: str = None
-    number_of_variables: int = None
-    number_of_singleton_variables: int = None
-    maximal_term_depth: int = None
-    total_number_of_literals: int = None
-    number_of_literals: int = None
-    total_number_of_functors: int = None
-    total_number_of_variables: int = None
+    # number_of_clauses: int = None
+    # number_of_unit_clauses: int = None
+    # number_of_atoms: int = None
+    # maximal_clause_size: int = None
+    # average_clause_size: int = None
+    # number_of_predicates: int = None
+    # predicate_arities: str = None
+    # number_of_functors: int = None
+    # number_of_constant_functors: int = None
+    # functor_arities: str = None
+    # number_of_variables: int = None
+    # number_of_singleton_variables: int = None
+    # maximal_term_depth: int = None
+    # total_number_of_literals: int = None
+    # number_of_literals: int = None
+    # total_number_of_functors: int = None
+    # total_number_of_variables: int = None
 
 
 @dataclass

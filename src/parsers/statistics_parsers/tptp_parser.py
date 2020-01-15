@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 
 from src.parsers.parsers import StatisticParser
@@ -9,6 +10,20 @@ from src.statistics.stats import ConjunctiveNormalFormFirstOrderLogicSATStatisti
 class TPTPParser(StatisticParser):
     @staticmethod
     def get_file_input_statistics(file_path: str) -> ConjunctiveNormalFormFirstOrderLogicSATStatistics:
+        assert file_path.endswith('.json'), 'expected json files for statistics'
+        with open(file_path, 'r') as fp:
+            dict = json.load(fp)
+        stats = ConjunctiveNormalFormFirstOrderLogicSATStatistics()
+        stats.SAT_type = SATType.CNF
+        for key, val in dict.items():
+            if key in ['clause_lengths', 'predicate_arities', 'functor_arities', 'term_instances_depths']:
+                setattr(stats, key, {int(key): int(val) for key, val in dict[key].items()})
+            else:
+                setattr(stats, key, val)
+        return stats
+
+    def get_statistics_based_on_fomula(self, file_path: str):
+        """depracated"""
         stats = ConjunctiveNormalFormFirstOrderLogicSATStatistics()
 
         with open(file_path) as source:

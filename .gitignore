@@ -8,3 +8,4 @@ venv
 benchmark.log
 config*
 *.json
+.cache

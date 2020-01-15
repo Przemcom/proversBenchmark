@@ -11,7 +11,7 @@ class InkresatCNFPTLStatisticParser(StatisticParser):
 
     @staticmethod
     def get_file_input_statistics(file_path: str) -> ConjunctiveNormalFormPropositionalTemporalLogicFormulaInfo:
-        assert file_path.endswith('.json'), 'inkresat parser expects json files for statistics'
+        assert file_path.endswith('.json'), 'expected json files for statistics'
         with open(file_path, 'r') as fp:
             dict = json.load(fp)
         stats = ConjunctiveNormalFormPropositionalTemporalLogicFormulaInfo()

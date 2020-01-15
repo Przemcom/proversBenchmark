@@ -105,8 +105,7 @@ class Config:
         """Load and config"""
         self._load_errors_occured = False
         if not os.path.isfile(self.config_file):
-            self._error(f"Config file '{self.config_file}'' is not found/not a file")
-            return
+            raise BenchmarkException(f"Config file '{self.config_file}'' is not found/not a file")
 
         benchmark_config = toml.load(self.config_file)
 
