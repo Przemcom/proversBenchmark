@@ -26,7 +26,7 @@ class TestInput:
 
     translators: ClassVar[List[Translator]] = []
 
-    cache_path: ClassVar[str] = "inputs"
+    cache_path: ClassVar[str] = ".cache"
 
     def __post_init__(self):
         if self.path is not None and not os.path.isabs(self.path):
@@ -83,10 +83,7 @@ class TestInput:
         for file in self.files:
             in_file_path = os.path.realpath(os.path.join(self.path, file))
             # /cwd/self._cache_path/self.name/desired_format/dir_structure(file)/file.extension
-            out_file_path = os.path.join(self.cwd,
-                                         TestInput.cache_path,
-                                         self.name,
-                                         desired_format,
+            out_file_path = os.path.join(self.cwd, TestInput.cache_path, self.name, desired_format,
                                          os.path.relpath(file, start=self.path))
             dirname, filename = os.path.split(out_file_path)
             if not os.path.exists(dirname):
