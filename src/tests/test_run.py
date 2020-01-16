@@ -78,7 +78,13 @@ class TestRun:
             minimal_statistics, input_statistics = test_input.get_file_statistics(file_path=original_paths)
             minimal_statistics.translated_with = translator
             command = self.build_command(executable=executable, input_filepath=test_input_path, suite_options=options)
-            logger.info(f'Executing {command}')
+            if not self.input_after_option and not self.input_as_last_argument:
+                if test_input_path != original_paths:
+                    logger.info(f'Executing {command} with file {original_paths} (translated {test_input_path})')
+                else:
+                    logger.info(f'Executing {command} with file {original_paths}')
+            else:
+                logger.info(f'Executing {command}')
 
             out_stats = OutputStatistics()
             env = os.environ
