@@ -23,7 +23,10 @@ class TPTPParser(StatisticParser):
         return stats
 
     def get_statistics_based_on_fomula(self, file_path: str):
-        """depracated"""
+        """depracated
+
+        Uses TPTP header to extract some information about formula
+        """
         stats = ConjunctiveNormalFormFirstOrderLogicSATStatistics()
 
         with open(file_path) as source:

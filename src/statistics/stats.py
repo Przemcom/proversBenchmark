@@ -1,14 +1,10 @@
 import datetime
-import json
 import platform
-import time
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import List, Dict, Union
 
 import psutil
-
-from src.statistics.json_encoder import ClassAsDictJSONEncoder
 
 
 @dataclass
@@ -145,18 +141,3 @@ class Statistics:
     test_suites: List[TestSuiteStatistics] = field(default_factory=list)
     date: datetime.datetime = datetime.datetime.now()
     hardware: HardwareStatistics = HardwareStatistics()
-
-
-if __name__ == '__main__':
-    import functools
-    from src.statistics.monitored_process import MonitoredProcess
-
-    proc = functools.partial(MonitoredProcess, ['sleep', '5'])
-    with proc() as running_process:
-        while running_process.poll():
-            time.sleep(0.1)
-
-    stats = running_process.get_statistics()
-    test_case_stats = TestRunStatistics(name="test", command=["ps", "-aux"], execution_statistics=stats,
-                                        minimal_input_statistics=ConjunctiveNormalFormFirstOrderLogicSATStatistics())
-    print(json.dumps(test_case_stats, default=ClassAsDictJSONEncoder))
