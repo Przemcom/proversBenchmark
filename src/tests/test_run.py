@@ -80,9 +80,10 @@ class TestRun:
             command = self.build_command(executable=executable, input_filepath=test_input_path, suite_options=options)
             if not self.input_after_option and not self.input_as_last_argument:
                 if test_input_path != original_paths:
-                    logger.info(f'Executing {command} with file {original_paths} (translated {test_input_path})')
+                    logger.info(f'Executing {command} with file {os.path.abspath(original_paths)} '
+                                f'(translated {os.path.abspath(test_input_path)})')
                 else:
-                    logger.info(f'Executing {command} with file {original_paths}')
+                    logger.info(f'Executing {command} with file {os.path.abspath(original_paths)}')
             else:
                 logger.info(f'Executing {command}')
 
@@ -129,8 +130,7 @@ class TestRun:
                         returncode=test_case_stats.execution_statistics.returncode,
                         stdout=out_stats.stdout, stderr=out_stats.stderr)
                 else:
-                    logger.warning('There is no parser to set output SAT status TODO')
-                    out_stats.status = SATStatus.UNKOWN
+                    logger.warning('There is no parser to set output SAT status. Status will be not set')
             test_case_stats.output = out_stats
             logger.info(f"Testcase '{self.name}' took "
                         f"{test_case_stats.execution_statistics.execution_time:.2f}, "

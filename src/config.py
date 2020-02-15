@@ -254,7 +254,7 @@ class Config:
 
             try:
                 test_input = TestInput(
-                    name=name, path=prefix, format=format, files=files,
+                    name=name, path=prefix, format=format.lower(), files=files,
                     gather_statistics_from_formula_file=gather_statistics_from_formula_file,
                     gather_statistics_from_json_file=gather_statistics_from_json_file)
             except BenchmarkException as e:

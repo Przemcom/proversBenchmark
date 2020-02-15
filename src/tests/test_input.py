@@ -56,7 +56,9 @@ class TestInput:
                 stats.name = self.name
                 return min_stats, stats
             except FileNotFoundError:
-                logger.warning(f'Statictics for {file_path} not available (not found file {file_path}.json)')
+                logger.warning(
+                    f'Statistics for {os.path.abspath(file_path)} not available (not found file {os.path.abspath(file_path)}.json)')
+
         return MinimalSATStatistics(name=self.name, path=file_path), None
 
     # todo add caching
